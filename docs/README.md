@@ -1,15 +1,22 @@
-# KM-Box: Low-Latency Gaming Input Relay
+# KM-Box: AI-Powered Gaming Enhancement System
 
-## 🎯 Project Overview
-A high-performance keyboard/mouse pass-through system for gaming, featuring:
-- **Raspberry Pi 5**: HID input capture & processing (Rust)
-- **Teensy 4.0**: USB HID output to gaming PC (C++)
-- **UART**: Low-latency communication between devices
+## 🎯 Project Vision
+An intelligent gaming input system that evolves from basic hardware relay to full AI-driven adaptive enhancement:
 
-## 🏗️ Architecture
+**Near-term**: Hardware relay + recoil compensation for Rainbow Six Siege  
+**Long-term**: AI integration with Aimmy project for adaptive visual analysis
+
+### Ultimate Architecture:
 ```
-Input Devices → Pi (hidapi) → UART → Teensy 4.0 → Gaming PC
-     USB             Rust        GPIO        C++        USB HID
+Gaming PC ← OBS Stream ← AI Analysis PC (Aimmy)
+    ↓                           ↓
+USB HID Input              AI Decisions
+    ↓                           ↓
+Teensy 4.0 ← UART ← Raspberry Pi 5 ← AI Commands
+    ↓                           ↓
+KM-Box Relay            Recoil Compensation
+    ↓                           ↓
+Enhanced Gaming         Adaptive AI Logic
 ```
 
 ## ✅ Current Status: Phase 3 Complete
@@ -39,16 +46,33 @@ ssh pi5 "cd ~/km-box && ./sync-pi.sh"
 ssh pi5 "cd ~/km-box && sudo ./pi_code/target/release/hid_test"
 ```
 
-## 📋 Phase Progress
+## 📋 Development Roadmap
 
-| Phase | Description | Status |
-|-------|-------------|--------|
-| 1 | Environment Setup | ✅ Complete |
-| 2 | UART Communication | ✅ Complete |
-| 3 | HID Input Capture | ✅ Complete |
-| 4 | USB HID Output | ⏳ Next |
-| 5 | Full Relay System | ⏳ Pending |
-| 6 | Optimization | ⏳ Pending |
+| Phase | Description | Status | Focus |
+|-------|-------------|--------|-------|
+| 1-3 | Hardware Foundation | ✅ Complete | Pi + Teensy relay |
+| 4 | USB HID Output | ⏳ Next | Complete basic relay |
+| 5 | Input Modification | ⏳ Pending | Filtering & transformation |
+| 6 | Recoil Scripts | ⏳ Pending | **R6S weapon patterns** |
+| 7 | Network API | ⏳ Pending | External control interface |
+| 8 | AI Foundation | ⏳ Pending | **Aimmy integration prep** |
+| 9 | Adaptive Recoil | ⏳ Pending | **OCR weapon detection** |
+| 10 | Full AI System | ⏳ Pending | **Complete Aimmy integration** |
+| 11 | Optimization | ⏳ Pending | <1ms latency, anti-detection |
+| 12 | Ecosystem | ⏳ Pending | Community tools & profiles |
+
+### Target Games:
+1. **Rainbow Six Siege** (Priority 1 - recoil patterns)
+2. Counter-Strike 2
+3. Valorant  
+4. Apex Legends
+5. Call of Duty series
+
+### AI Integration Goals:
+- **Aimmy GitHub**: Fork and integrate visual analysis
+- **Multi-PC Setup**: Gaming PC + AI Analysis PC  
+- **OBS Streaming**: Real-time game analysis
+- **Adaptive Logic**: Auto-adjust to weapon changes
 
 ## 🛠️ Technical Stack
 
@@ -85,5 +109,9 @@ km-box/
 └── sync-pi.sh         # Build/deploy script
 ```
 
-## 🎮 Next: Phase 4
-Implement USB HID output on Teensy to complete the input relay chain.
+## 🎮 Next Steps: Rainbow Six Siege Focus
+**Immediate Priority**: Complete Phase 4, then implement R6S recoil compensation
+
+**Future Vision**: OCR-based adaptive recoil that automatically detects weapons and attachments, eliminating the need for manual profile switching.
+
+**AI Integration**: Work towards full Aimmy project integration for visual game analysis and intelligent input enhancement.

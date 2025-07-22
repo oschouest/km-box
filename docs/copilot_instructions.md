@@ -1,10 +1,29 @@
 # Copilot Instructions for KM Box Project
 
 ## Project Overview
-The KM Box is a low-latency keyboard/mouse pass-through and injection system for gaming, consisting of:
-- **Raspberry Pi 5**: Running Rust code for input capture and processing
-- **Teensy 4.0**: Running C++ code for USB HID output to gaming PC
-- **Communication**: UART connection between Pi and Teensy
+The KM Box is an AI-powered gaming enhancement system, evolving from a simple input relay to a complete adaptive gaming intelligence platform:
+
+**Phase 1-3 (Current)**: Basic hardware relay (Pi↔Teensy)
+**Phase 4-6**: Input modification & recoil compensation 
+**Phase 7-9**: AI integration with Aimmy GitHub project
+**Phase 10-12**: Adaptive OCR-based recoil intelligence
+
+### Ultimate Vision:
+```
+Gaming PC ← OBS Stream ← AI Analysis PC (Aimmy)
+    ↓                           ↓
+USB HID Input              AI Decisions  
+    ↓                           ↓
+Teensy 4.0 ← UART ← Raspberry Pi 5 ← AI Commands
+    ↓                           ↓
+KM-Box Relay            Recoil Compensation
+    ↓                           ↓
+Enhanced Gaming         Adaptive AI Logic
+```
+
+**Target Games**: Rainbow Six Siege (priority), CS2, Valorant, Apex
+**AI Integration**: Aimmy project for visual analysis & decision making
+**Adaptive Recoil**: OCR weapon detection, auto-compensation
 
 ## Architecture
 ```
@@ -26,7 +45,7 @@ Gaming PC <-- USB HID --> Teensy 4.0 <-- UART --> Raspberry Pi 5 <-- USB --> Inp
 - ✅ UART initialization to Teensy (/dev/ttyAMA0, 9600 baud)
 - ✅ GPIO communication ready (Pi GPIO 14/15 ↔ Teensy pins 0/1)
 
-**Next Phase:** Full HID→UART→Teensy→USB HID relay testing
+**Next Phase:** Phase 4 USB HID output, then R6S recoil scripts, leading to full Aimmy AI integration
 
 ## Development Environment
 - **Languages**: Rust (Pi), C++ Arduino/Teensyduino (Teensy)
@@ -52,8 +71,14 @@ km-box/
 2. **Phase 2**: UART communication between Pi and Teensy ✅  
 3. **Phase 3**: Input capture on Pi (hidapi) ✅ **← COMPLETED**
 4. **Phase 4**: USB HID output on Teensy ⏳ **← NEXT**
-5. **Phase 5**: Complete pass-through system
-6. **Phase 6**: Injection capabilities and optimization
+5. **Phase 5**: Input modification framework
+6. **Phase 6**: Recoil compensation (R6S priority)
+7. **Phase 7**: Network API for external control
+8. **Phase 8**: Aimmy AI integration foundation
+9. **Phase 9**: OCR-based adaptive recoil intelligence  
+10. **Phase 10**: Full AI enhancement system
+11. **Phase 11**: Production optimization (<1ms latency)
+12. **Phase 12**: Ecosystem & community tools
 
 ## Coding Guidelines - VERIFIED PATTERNS
 - **Rust**: Use hidapi for HID, serialport builder API, proper error handling with Result<>
