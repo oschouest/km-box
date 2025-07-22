@@ -1,36 +1,95 @@
-# KM-Box Project
+# KM Box - Low-Latency Keyboard/Mouse Pass-through System
 
-A multi-platform project for keyboard/mouse passthrough using Teensy 4.0 and Raspberry Pi.
+## Project Overview
+The KM Box is a hardware solution for low-latency keyboard and mouse pass-through and injection, designed for gaming applications. The system consists of a Raspberry Pi 5 connected to a Teensy 4.0 microcontroller via UART.
+
+## Architecture
+```
+Gaming PC <-- USB HID --> Teensy 4.0 <-- UART --> Raspberry Pi 5 <-- USB --> Input Devices
+```
+
+## Hardware Components
+- **Raspberry Pi 5**: Input capture and processing (Rust)
+- **Teensy 4.0**: USB HID output to gaming PC (C++/Arduino)
+- **UART Connection**: GPIO pins for Pi-Teensy communication
+
+## Software Stack
+- **Pi Code**: Rust with serialport, evdev, and tokio crates
+- **Teensy Code**: C++ with Arduino framework and PlatformIO
+- **Development**: VS Code with Remote-SSH and PlatformIO extension
 
 ## Project Structure
+```
+km-box/
+├── pi_code/                 # Rust project for Raspberry Pi
+├── teensy_code/             # PlatformIO project for Teensy 4.0
+│   ├── platformio.ini       # Board configuration
+│   ├── src/main.cpp         # Arduino C++ code
+│   └── .vscode/             # VS Code settings
+└── docs/                    # Documentation
+    ├── project_log.md       # Development log
+    └── copilot_instructions.md # AI assistant context
+```
 
-- `teensy_fw/` - PlatformIO project for Teensy 4.0 firmware
-- `pi_passthrough/` - Python scripts for Raspberry Pi
-- `km-box.code-workspace` - VS Code workspace configuration
+## Setup Instructions
 
-## Hardware Setup
+### Prerequisites
+- VS Code with PlatformIO and Remote-SSH extensions
+- Raspberry Pi 5 with Raspbian OS
+- Teensy 4.0 with Teensyduino
+- SSH access to Pi configured
 
-### Teensy 4.0
-- Connect Teensy 4.0 to target computer via USB
-- Connect Teensy Serial1 pins to Raspberry Pi UART:
-  - Teensy Pin 0 (RX1) → Pi GPIO 14 (TX)
-  - Teensy Pin 1 (TX1) → Pi GPIO 15 (RX)
-  - Connect GND between devices
+### Phase 1: Environment Setup
+1. **SSH Key Setup**: Generate RSA key and copy to Pi for passwordless access
+2. **Rust Installation**: Install Rust toolchain on Raspberry Pi
+3. **PlatformIO**: Verify Teensy project builds and uploads
+4. **Basic Testing**: Run "hello world" on both platforms
 
-### Raspberry Pi
-- Enable UART in `/boot/config.txt`: `enable_uart=1`
-- Disable serial console in `/boot/cmdline.txt`
-- Install Python dependencies: `pip install -r requirements.txt`
+### Development Phases
+1. **Phase 1**: Environment validation and basic connectivity ✅
+2. **Phase 2**: UART communication between Pi and Teensy
+3. **Phase 3**: Input capture from USB devices on Pi
+4. **Phase 4**: USB HID output implementation on Teensy
+5. **Phase 5**: Complete pass-through functionality
+6. **Phase 6**: Advanced features and optimization
 
-## Usage
+## Current Status: Phase 1 - Environment Setup
+- [x] Project structure created
+- [x] SSH key generated for Pi access
+- [x] Teensy PlatformIO project configured
+- [x] Basic "hello world" code prepared
+- [ ] SSH key copied to Pi (waiting for password entry)
+- [ ] Rust installed on Pi
+- [ ] Initial testing completed
 
-1. Flash the Teensy firmware using PlatformIO
-2. Run the Python script on Raspberry Pi: `python send_serial_test.py`
-3. Characters sent from Pi will be typed on the target computer
+## Connection Details
+- **Pi SSH**: otis@192.168.1.117 (key-based auth)
+- **Teensy USB**: Connected for programming and serial monitor
+- **UART**: Pi GPIO → Teensy Serial1 (future phases)
 
-## Development
+## Commands Quick Reference
 
-Open `km-box.code-workspace` in VS Code for the best development experience with:
-- PlatformIO IDE extension for Teensy development
-- Python extension for Pi scripts
-- IntelliSense and debugging support
+### Build Teensy Code
+```bash
+# In teensy_code folder
+pio run
+pio run --target upload
+```
+
+### SSH to Pi
+```bash
+ssh pi5  # After SSH config setup
+```
+
+### Sync Code to Pi
+```bash
+rsync -avz --delete pi_code/ pi5:~/km_box_project/pi_code/
+```
+
+## Notes
+- Monitor speed: 115200 baud for all serial communications
+- LED_BUILTIN used for visual feedback during testing
+- Error handling and logging implemented for debugging
+
+---
+*Project Log: See [docs/project_log.md](docs/project_log.md) for detailed development notes*
