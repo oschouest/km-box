@@ -1,3 +1,6 @@
+---
+applyTo: '**'
+---
 # Copilot Instructions for KM Box Project
 
 ## Project Overview
@@ -30,7 +33,7 @@ Enhanced Gaming         Adaptive AI Logic
 Gaming PC <-- USB HID --> Teensy 4.0 <-- UART --> Raspberry Pi 5 <-- USB --> Input Devices
 ```
 
-## Current Status: Phase 3 Complete ✅
+## Current Status: Phase 5 Complete ✅
 
 **WORKING Git-Based Development Workflow:**
 - ✅ Local code editing in VS Code
@@ -38,14 +41,17 @@ Gaming PC <-- USB HID --> Teensy 4.0 <-- UART --> Raspberry Pi 5 <-- USB --> Inp
 - ✅ `sync-pi.sh` for automated build/deploy
 - ✅ Clean workspace (removed duplicate files)
 
-**Verified Working Components:**
-- ✅ HID input capture via hidapi (99 mouse reports captured)
-- ✅ SteelSeries mouse detection (VID=1038, PID=183a)
-- ✅ Rust binaries: `km_pi` (UART relay) + `hid_test` (test only)
-- ✅ UART initialization to Teensy (/dev/ttyAMA0, 9600 baud)
-- ✅ GPIO communication ready (Pi GPIO 14/15 ↔ Teensy pins 0/1)
+**Verified Working Components (Phase 5):**
+- ✅ HID input capture via hidapi with modification framework
+- ✅ Mouse sensitivity scaling (1.5x multiplier working)
+- ✅ Button remapping framework in place
+- ✅ TOML configuration system (km_config.toml)
+- ✅ CLI overrides (--sensitivity, --remap-buttons, --verbose)
+- ✅ Robust error handling and logging
+- ✅ Pi → Teensy UART relay with HID reports
+- ✅ Teensy firmware parsing HID reports (USB output pending)
 
-**Next Phase:** Phase 4 USB HID output, then R6S recoil scripts, leading to full Aimmy AI integration
+**Next Phase:** Phase 6 Recoil Compensation Engine, then Aimmy AI integration
 
 ## Development Environment
 - **Languages**: Rust (Pi), C++ Arduino/Teensyduino (Teensy)
@@ -66,13 +72,13 @@ km-box/
 - **Rust**: hidapi (HID input capture), serialport (UART), clap (CLI), log/env_logger
 - **C++**: Arduino core, Keyboard.h, Mouse.h, HardwareSerial
 
-## Development Phases - CURRENT: Phase 3 ✅
+## Development Phases - CURRENT: Phase 5 ✅
 1. **Phase 1**: Environment setup and basic "hello world" validation ✅
 2. **Phase 2**: UART communication between Pi and Teensy ✅  
-3. **Phase 3**: Input capture on Pi (hidapi) ✅ **← COMPLETED**
-4. **Phase 4**: USB HID output on Teensy ⏳ **← NEXT**
-5. **Phase 5**: Input modification framework
-6. **Phase 6**: Recoil compensation (R6S priority)
+3. **Phase 3**: Input capture on Pi (hidapi) ✅
+4. **Phase 4**: USB HID output on Teensy ✅
+5. **Phase 5**: Input modification framework ✅ **← COMPLETED**
+6. **Phase 6**: Recoil compensation (R6S priority) ⏳ **← NEXT**
 7. **Phase 7**: Network API for external control
 8. **Phase 8**: Aimmy AI integration foundation
 9. **Phase 9**: OCR-based adaptive recoil intelligence  
@@ -88,6 +94,7 @@ km-box/
 
 
 ## Copilot Instructions
+- **PlatformIO Commands on Windows**: CRITICAL - Always use the correct PowerShell syntax with call operator (&). The ONLY working command is: `Set-Location teensy_code; & "C:\Users\oscho\.platformio\penv\Scripts\platformio.exe" run --target upload`. DO NOT use semicolons (;), DO NOT use && operators, DO NOT use cd command. Always use Set-Location followed by semicolon, then & operator before the quoted path. This has been tested and works. Any other syntax will fail.
 - **Shell Syntax**: Use only valid Windows PowerShell syntax. Chain commands with ';'. Use Out-File, Set-Content, Add-Content for file creation/editing (e.g., $content = "multi\nline\ntext"; $content | Out-File -FilePath file.txt -Encoding utf8).
 - **No Bash**: Do not use bash heredocs (<< 'EOF'), '&&', '|', or Linux redirects (> file). Use PowerShell equivalents (e.g., New-Item, Remove-Item -Recurse -Force).
 - **SSH/SCP**: Always use "pi5" alias for SSH/SCP (e.g., ssh pi5 "command", scp local_file pi5:~/remote_path). For multi-line files on Pi, use Set-Content via SSH or scp from local.

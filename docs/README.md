@@ -22,12 +22,15 @@ Enhanced Gaming         Adaptive AI Logic
 ## ✅ Current Status: Phase 5 Complete
 
 ### Working Components:
-- **Input Modification Framework**: Sensitivity scaling and button remapping
+- **Input Modification Framework**: 1.5x sensitivity scaling working perfectly
+- **Button Remapping**: Framework implemented and tested
 - **Configuration System**: TOML-based settings with CLI overrides
-- **HID Input Capture**: 99 mouse reports captured via hidapi
-- **Device Detection**: SteelSeries mouse (VID=1038, PID=183a)
+- **Real-time Processing**: Live mouse input modification (--sensitivity 1.5 --verbose)
+- **HID Input Capture**: Continuous mouse reports via hidapi
+- **Device Detection**: SteelSeries mouse (VID=1038, PID=183a)  
 - **Git Workflow**: Push/pull sync with automated build
-- **UART Communication**: Pi GPIO 14/15 ↔ Teensy pins 0/1
+- **UART Communication**: Pi → Teensy HID report relay active
+- **Teensy Firmware**: Parsing and logging modified HID reports
 
 ### Phase 5 Features:
 - **Mouse Sensitivity**: `--sensitivity 1.5` for 50% speed boost

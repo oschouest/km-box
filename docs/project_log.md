@@ -236,3 +236,34 @@ loop {
 - **AI PC**: RTX 4060+ for real-time OCR/analysis
 - **Gaming PC**: High-refresh monitor, stable FPS
 - **Network**: Low-latency LAN between PCs
+
+---
+
+## 📅 2025-07-22: Phase 5 Complete - Input Modification Framework ✅
+
+### Achievements:
+- **Live Input Modification**: 1.5x sensitivity scaling working perfectly
+- **Real-time Processing**: Mouse movement (dx,dy) modified in real-time
+- **Button Detection**: Left/right/middle click states captured and processed
+- **Configuration System**: TOML config + CLI overrides (--sensitivity, --remap-buttons)
+- **UART Relay**: Pi successfully sends modified HID reports to Teensy
+- **Teensy Parsing**: Firmware correctly receives and parses hex-encoded reports
+
+### Test Results:
+```
+[2025-07-22T20:19:56Z DEBUG km_pi] Raw HID report: buttons=00, dx=-3, dy=-1, wheel=2
+[2025-07-22T20:19:56Z DEBUG km_pi] Sensitivity: 1.50 | Original: (-3, -1) -> Modified: (-5, -2)
+[2025-07-22T20:19:56Z DEBUG km_pi] Modified report: buttons=00, dx=-5, dy=-2, wheel=2
+```
+
+### Architecture Status:
+- ✅ **Pi Code**: Input modification framework (main.rs)
+- ✅ **Teensy Code**: HID report parsing (main.cpp)
+- ✅ **Configuration**: km_config.toml + CLI overrides
+- ✅ **Testing**: Live mouse input with 1.5x scaling verified
+- 🔄 **USB Output**: Teensy logs USB commands (physical output pending)
+
+### Next Phase: Phase 6 - Recoil Compensation Engine
+- Target: R6S weapon-specific recoil patterns
+- Approach: OCR weapon detection + pre-programmed compensation
+- Integration: Aimmy AI project for visual analysis
