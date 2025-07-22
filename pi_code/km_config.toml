@@ -1,0 +1,14 @@
+# KM-Box Phase 5 Configuration File
+# Mouse sensitivity scaling and modification settings
+
+# Mouse sensitivity multiplier (1.0 = no change, >1.0 = faster, <1.0 = slower)
+sensitivity = 1.0
+
+# Button remapping: swap left and right mouse buttons
+remap_buttons = false
+
+# Deadzone threshold: ignore movements smaller than this value (in raw units)
+deadzone_threshold = 1
+
+# Maximum acceleration multiplier to prevent overflow
+max_acceleration = 10.0

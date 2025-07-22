@@ -1,15 +1,15 @@
 use std::io::Write;
 use std::time::Duration;
-use hidapi::{HidApi, HidDevice, HidResult};
+use std::fs;
+use hidapi::HidApi;
 use serialport::SerialPort;
-use tokio::time::sleep;
-use tokio::sync::mpsc;
 use clap::Parser;
 use log::{info, warn, error, debug};
+use serde::{Deserialize, Serialize};
 
 #[derive(Parser, Debug)]
 #[command(name = "km_pi")]
-#[command(about = "KM-Box Phase 3: HID Input Capture & UART Relay")]
+#[command(about = "KM-Box Phase 5: Input Modification Framework")]
 struct Args {
     /// Target mouse vendor ID (hex)
     #[arg(long, default_value = "0x1038")]
@@ -18,6 +18,18 @@ struct Args {
     /// Target mouse product ID (hex)  
     #[arg(long, default_value = "0x183a")]
     mouse_pid: String,
+
+    /// Mouse sensitivity multiplier
+    #[arg(long, default_value_t = 1.0)]
+    sensitivity: f32,
+
+    /// Enable button remapping (swap left/right)
+    #[arg(long)]
+    remap_buttons: bool,
+
+    /// Config file path (TOML format)
+    #[arg(long, default_value = "km_config.toml")]
+    config: String,
 
     /// Enable verbose logging
     #[arg(short, long)]
@@ -28,33 +40,171 @@ struct Args {
     list_devices: bool,
 }
 
-#[derive(Debug)]
-enum InputEvent {
-    Mouse(Vec<u8>),
-    Keyboard(Vec<u8>),
+#[derive(Debug, Serialize, Deserialize)]
+struct Config {
+    sensitivity: f32,
+    remap_buttons: bool,
+    deadzone_threshold: i8,
+    max_acceleration: f32,
 }
 
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            sensitivity: 1.0,
+            remap_buttons: false,
+            deadzone_threshold: 1,
+            max_acceleration: 10.0,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+struct MouseReport {
+    buttons: u8,
+    dx: i8,
+    dy: i8,
+    wheel: i8,
+}
+
+impl MouseReport {
+    fn from_bytes(data: &[u8]) -> Option<Self> {
+        if data.len() >= 4 {
+            Some(MouseReport {
+                buttons: data[0],
+                dx: data[1] as i8,
+                dy: data[2] as i8,
+                wheel: data[3] as i8,
+            })
+        } else {
+            None
+        }
+    }
+
+    fn to_bytes(&self) -> Vec<u8> {
+        vec![self.buttons, self.dx as u8, self.dy as u8, self.wheel as u8]
+    }
+}
+
+struct InputModifier {
+    config: Config,
+}
+
+impl InputModifier {
+    fn new(config: Config) -> Self {
+        Self { config }
+    }
+
+    fn modify_mouse_report(&self, report: MouseReport) -> Result<MouseReport, String> {
+        let mut modified = report.clone();
+
+        // Apply sensitivity scaling with overflow protection
+        if self.config.sensitivity != 1.0 {
+            let new_dx = (modified.dx as f32 * self.config.sensitivity).round();
+            let new_dy = (modified.dy as f32 * self.config.sensitivity).round();
+
+            // Clamp to i8 range and apply acceleration limiting
+            modified.dx = new_dx.max(-127.0).min(127.0) as i8;
+            modified.dy = new_dy.max(-127.0).min(127.0) as i8;
+
+            // Apply deadzone
+            if modified.dx.abs() < self.config.deadzone_threshold {
+                modified.dx = 0;
+            }
+            if modified.dy.abs() < self.config.deadzone_threshold {
+                modified.dy = 0;
+            }
+
+            debug!("Sensitivity: {:.2} | Original: ({}, {}) -> Modified: ({}, {})", 
+                   self.config.sensitivity, report.dx, report.dy, modified.dx, modified.dy);
+        }
+
+        // Apply button remapping (swap left/right mouse buttons)
+        if self.config.remap_buttons {
+            let left_pressed = (modified.buttons & 0x01) != 0;
+            let right_pressed = (modified.buttons & 0x02) != 0;
+
+            // Clear left and right button bits
+            modified.buttons &= !0x03;
+
+            // Swap them
+            if left_pressed {
+                modified.buttons |= 0x02; // Set right button
+            }
+            if right_pressed {
+                modified.buttons |= 0x01; // Set left button
+            }
+
+            if left_pressed || right_pressed {
+                debug!("Button remap: Original buttons={:02x} -> Modified buttons={:02x}", 
+                       report.buttons, modified.buttons);
+            }
+        }
+
+        Ok(modified)
+    }
+}
+
+fn load_config(config_path: &str, args: &Args) -> Config {
+    let mut config = if let Ok(content) = fs::read_to_string(config_path) {
+        match toml::from_str(&content) {
+            Ok(cfg) => {
+                info!("✓ Loaded configuration from {}", config_path);
+                cfg
+            }
+            Err(e) => {
+                warn!("Failed to parse config file {}: {}. Using defaults.", config_path, e);
+                Config::default()
+            }
+        }
+    } else {
+        info!("Config file {} not found. Using defaults.", config_path);
+        Config::default()
+    };
+
+    // Override with CLI arguments
+    config.sensitivity = args.sensitivity;
+    config.remap_buttons = args.remap_buttons;
+
+    // Save current config back to file for future reference
+    if let Ok(toml_content) = toml::to_string_pretty(&config) {
+        if let Err(e) = fs::write(config_path, toml_content) {
+            warn!("Failed to save config to {}: {}", config_path, e);
+        } else {
+            debug!("✓ Saved current config to {}", config_path);
+        }
+    }
+
+    config
+}
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
     
     // Setup logging
     if args.verbose {
-        env_logger::init();
+        env_logger::Builder::from_default_env()
+            .filter_level(log::LevelFilter::Debug)
+            .init();
+    } else {
+        env_logger::Builder::from_default_env()
+            .filter_level(log::LevelFilter::Info)
+            .init();
     }
     
-    info!("=== KM-Box Phase 3: HID Input Capture & UART Relay ===");
-    info!("Initializing HID input capture and UART communication...");
-
-    // Initialize HID API
-    let api = HidApi::new()?;
+    info!("=== KM-Box Phase 5: Input Modification Framework ===");
+    info!("Enhanced input processing with sensitivity scaling and button remapping");
 
     // List devices if requested
     if args.list_devices {
         info!("Enumerating all HID devices...");
-        for device in api.device_list() {
-            println!("Device: VID={:04x} PID={:04x} Path={:?}", 
-                device.vendor_id(), device.product_id(), device.path().to_string_lossy());
+        let api = HidApi::new()?;
+        for device_info in api.device_list() {
+            println!("Device: VID={:04x} PID={:04x} Manufacturer={:?} Product={:?}", 
+                device_info.vendor_id(), 
+                device_info.product_id(),
+                device_info.manufacturer_string(),
+                device_info.product_string());
         }
         return Ok(());
     }
@@ -65,11 +215,27 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     
     info!("Target mouse: VID={:04x} PID={:04x}", mouse_vid, mouse_pid);
 
-    // Setup UART communication channel
-    let (tx, mut rx) = mpsc::channel::<InputEvent>(100);
+    // Load configuration
+    let config = load_config(&args.config, &args);
+    info!("Configuration: sensitivity={:.2}, remap_buttons={}, deadzone={}", 
+          config.sensitivity, config.remap_buttons, config.deadzone_threshold);
+
+    // Initialize input modifier
+    let modifier = InputModifier::new(config);
+
+    // Open HID device
+    let api = HidApi::new()?;
+    let device = api.open(mouse_vid, mouse_pid)
+        .map_err(|e| {
+            error!("Failed to open mouse device VID={:04x} PID={:04x}: {}", mouse_vid, mouse_pid, e);
+            error!("Make sure the device is connected and you have proper permissions");
+            e
+        })?;
+    
+    info!("✓ Connected to mouse device");
 
     // Open UART connection to Teensy
-    let uart_port = serialport::new("/dev/ttyAMA0", 9600)
+    let mut uart_port = serialport::new("/dev/ttyAMA0", 9600)
         .timeout(Duration::from_millis(100))
         .data_bits(serialport::DataBits::Eight)
         .parity(serialport::Parity::None)
@@ -84,91 +250,188 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     info!("✓ UART connected to Teensy at 9600 baud");
 
-    // Send initialization ping to Teensy
-    let init_msg = "phase3_hidapi_start\n";
-    let mut uart_clone = uart_port.try_clone()?;
-    uart_clone.write_all(init_msg.as_bytes())?;
-    uart_clone.flush()?;
-    info!("✓ Sent initialization signal to Teensy");
+    // Send initialization signal
+    let init_msg = "phase5_start\n";
+    uart_port.write_all(init_msg.as_bytes())?;
+    uart_port.flush()?;
+    info!("✓ Sent Phase 5 initialization signal to Teensy");
 
-    // Open mouse device
-    let mouse_device = api.open(mouse_vid, mouse_pid)
-        .map_err(|e| {
-            error!("Failed to open mouse device VID={:04x} PID={:04x}: {}", mouse_vid, mouse_pid, e);
-            e
-        })?;
-    
-    info!("✓ Opened mouse device VID={:04x} PID={:04x}", mouse_vid, mouse_pid);
+    info!("Starting input modification loop... Press Ctrl+C to stop");
 
-    // Start mouse monitoring task
-    let mouse_tx = tx.clone();
-    let mouse_task = tokio::task::spawn_blocking(move || {
-        monitor_mouse_device(mouse_device, mouse_tx)
-    });
-
-    // UART relay task
-    let uart_task = tokio::spawn(async move {
-        let mut uart = uart_port;
-        while let Some(event) = rx.recv().await {
-            if let Err(e) = send_to_teensy(&mut uart, event).await {
-                error!("UART send failed: {}", e);
-            }
-        }
-    });
-
-    info!("✓ All monitoring tasks started");
-    info!("Monitoring for input events... Press Ctrl+C to stop");
-
-    // Wait for all tasks (they run indefinitely unless error)
-    tokio::try_join!(mouse_task, uart_task)?;
-
-    Ok(())
-}
-
-fn monitor_mouse_device(device: HidDevice, tx: mpsc::Sender<InputEvent>) -> Result<(), String> {
-    info!("🖱️ Starting mouse monitoring...");
-    
     let mut buf = [0u8; 64];
-    
+    let mut report_count = 0u64;
+    let mut modified_count = 0u64;
+
     loop {
         match device.read_timeout(&mut buf, 100) {
             Ok(size) if size > 0 => {
-                debug!("Mouse HID report: {:?}", &buf[..size]);
-                let data = buf[..size].to_vec();
-                
-                // Send to UART relay task
-                if let Err(e) = tx.blocking_send(InputEvent::Mouse(data)) {
-                    error!("Failed to send mouse event: {}", e);
-                    break;
+                report_count += 1;
+
+                // Parse the HID report
+                if let Some(original_report) = MouseReport::from_bytes(&buf[..size]) {
+                    debug!("Raw HID report: buttons={:02x}, dx={}, dy={}, wheel={}", 
+                           original_report.buttons, original_report.dx, original_report.dy, original_report.wheel);
+
+                    // Apply modifications
+                    match modifier.modify_mouse_report(original_report.clone()) {
+                        Ok(modified_report) => {
+                            // Check if any modifications were applied
+                            let was_modified = original_report.dx != modified_report.dx ||
+                                             original_report.dy != modified_report.dy ||
+                                             original_report.buttons != modified_report.buttons;
+
+                            if was_modified {
+                                modified_count += 1;
+                                debug!("Modified report: buttons={:02x}, dx={}, dy={}, wheel={}", 
+                                       modified_report.buttons, modified_report.dx, modified_report.dy, modified_report.wheel);
+                            }
+
+                            // Convert back to bytes and send
+                            let modified_bytes = modified_report.to_bytes();
+                            let hex_data = hex::encode(&modified_bytes);
+                            let uart_msg = format!("HID:{}\n", hex_data);
+                            
+                            if let Err(e) = uart_port.write_all(uart_msg.as_bytes()) {
+                                error!("UART write failed: {}", e);
+                            } else if let Err(e) = uart_port.flush() {
+                                error!("UART flush failed: {}", e);
+                            }
+                        }
+                        Err(e) => {
+                            // Fallback to original report on modification error
+                            warn!("Modification failed: {}. Using original report.", e);
+                            let hex_data = hex::encode(&buf[..size]);
+                            let uart_msg = format!("HID:{}\n", hex_data);
+                            
+                            if let Err(e) = uart_port.write_all(uart_msg.as_bytes()) {
+                                error!("UART write failed: {}", e);
+                            } else if let Err(e) = uart_port.flush() {
+                                error!("UART flush failed: {}", e);
+                            }
+                        }
+                    }
+                } else {
+                    // Not a standard mouse report, forward as-is
+                    debug!("Non-standard HID report ({} bytes), forwarding as-is", size);
+                    let hex_data = hex::encode(&buf[..size]);
+                    let uart_msg = format!("HID:{}\n", hex_data);
+                    
+                    if let Err(e) = uart_port.write_all(uart_msg.as_bytes()) {
+                        error!("UART write failed: {}", e);
+                    } else if let Err(e) = uart_port.flush() {
+                        error!("UART flush failed: {}", e);
+                    }
+                }
+
+                // Log statistics every 1000 reports
+                if report_count % 1000 == 0 {
+                    info!("Stats: {} reports processed, {} modified ({:.1}%)", 
+                          report_count, modified_count, 
+                          (modified_count as f64 / report_count as f64) * 100.0);
                 }
             }
             Ok(_) => {
-                // Timeout, continue
+                // No data available, continue
+                continue;
             }
             Err(e) => {
-                warn!("Mouse read error: {}", e);
-                std::thread::sleep(Duration::from_millis(100));
+                warn!("HID read error: {}", e);
+                std::thread::sleep(Duration::from_millis(10));
             }
         }
     }
-    
-    Ok(())
+}
+    }
 }
 
-async fn send_to_teensy(uart: &mut Box<dyn SerialPort>, event: InputEvent) -> Result<(), Box<dyn std::error::Error>> {
-    let (prefix, data) = match event {
-        InputEvent::Mouse(data) => ("MOUSE:", data),
-        InputEvent::Keyboard(data) => ("KEYBOARD:", data),
-    };
+async fn handle_mouse_events(device: &mut Device, tx: &mpsc::UnboundedSender<InputEvent>, verbose: bool) -> Result<(), Box<dyn std::error::Error>> {
+    if verbose {
+        println!("🖱️ Mouse event handler started");
+    }
     
-    let hex_data = hex::encode(&data);
-    let message = format!("{}{}", prefix, hex_data);
+    loop {
+        match device.fetch_events() {
+            Ok(events) => {
+                for event in events {
+                    match event.event_type() {
+                        EventType::RELATIVE => {
+                            // Mouse movement
+                            let axis = match event.code() {
+                                0 => "REL_X",  // Horizontal movement
+                                1 => "REL_Y",  // Vertical movement  
+                                8 => "REL_WHEEL", // Scroll wheel
+                                _ => continue,
+                            };
+                            let message = format!("mouse:{}:{}\n", axis, event.value());
+                            if let Err(e) = tx.send(InputEvent::Mouse(message)) {
+                                eprintln!("Failed to send mouse event: {}", e);
+                                return Err(e.into());
+                            }
+                        }
+                        EventType::KEY => {
+                            // Mouse buttons
+                            let button = match event.code() {
+                                272 => "BTN_LEFT",
+                                273 => "BTN_RIGHT", 
+                                274 => "BTN_MIDDLE",
+                                _ => continue,
+                            };
+                            let message = format!("mouse:{}:{}\n", button, event.value());
+                            if let Err(e) = tx.send(InputEvent::Mouse(message)) {
+                                eprintln!("Failed to send mouse button event: {}", e);
+                                return Err(e.into());
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            Err(_) => {
+                sleep(Duration::from_millis(10)).await;
+            }
+        }
+    }
+}
+
+async fn handle_keyboard_events(device: &mut Device, tx: &mpsc::UnboundedSender<InputEvent>, verbose: bool) -> Result<(), Box<dyn std::error::Error>> {
+    if verbose {
+        println!("⌨️ Keyboard event handler started");
+    }
     
-    debug!("Sending to Teensy: {}", message);
+    loop {
+        match device.fetch_events() {
+            Ok(events) => {
+                for event in events {
+                    match event.event_type() {
+                        EventType::KEY => {
+                            // Convert evdev key code to key name (simplified)
+                            let key_name = format!("KEY_{}", event.code());
+                            let message = format!("key:{}:{}\n", key_name, event.value());
+                            if let Err(e) = tx.send(InputEvent::Keyboard(message)) {
+                                eprintln!("Failed to send keyboard event: {}", e);
+                                return Err(e.into());
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            Err(_) => {
+                sleep(Duration::from_millis(10)).await;
+            }
+        }
+    }
+}
+
+async fn send_to_teensy(port: &mut Box<dyn SerialPort>, message: &str) -> Result<(), Box<dyn std::error::Error>> {
+    print!("📤 {}", message.trim());
+    std::io::stdout().flush()?;
     
-    uart.write_all(message.as_bytes())?;
-    uart.write_all(b"\n")?;
-    uart.flush()?;
+    port.write_all(message.as_bytes())?;
+    port.flush()?;
+    
+    // Brief delay to prevent overwhelming the UART
+    sleep(Duration::from_millis(5)).await;
     
     Ok(())
 }
