@@ -11,6 +11,23 @@ The KM Box is a low-latency keyboard/mouse pass-through and injection system for
 Gaming PC <-- USB HID --> Teensy 4.0 <-- UART --> Raspberry Pi 5 <-- USB --> Input Devices
 ```
 
+## Current Status: Phase 3 Complete ✅
+
+**WORKING Git-Based Development Workflow:**
+- ✅ Local code editing in VS Code
+- ✅ Git push/pull for Pi synchronization  
+- ✅ `sync-pi.sh` for automated build/deploy
+- ✅ Clean workspace (removed duplicate files)
+
+**Verified Working Components:**
+- ✅ HID input capture via hidapi (99 mouse reports captured)
+- ✅ SteelSeries mouse detection (VID=1038, PID=183a)
+- ✅ Rust binaries: `km_pi` (UART relay) + `hid_test` (test only)
+- ✅ UART initialization to Teensy (/dev/ttyAMA0, 9600 baud)
+- ✅ GPIO communication ready (Pi GPIO 14/15 ↔ Teensy pins 0/1)
+
+**Next Phase:** Full HID→UART→Teensy→USB HID relay testing
+
 ## Development Environment
 - **Languages**: Rust (Pi), C++ Arduino/Teensyduino (Teensy)
 - **Tools**: VS Code with Remote-SSH, PlatformIO, Cargo
@@ -26,27 +43,24 @@ km-box/
 └── docs/              # Documentation
 ```
 
-## Key Libraries/Crates
-- **Rust**: serialport (use builder pattern for port config, e.g., serialport::new(path, baud).open()), evdev, tokio (async runtime)
+## Key Libraries/Crates - VERIFIED WORKING
+- **Rust**: hidapi (HID input capture), serialport (UART), clap (CLI), log/env_logger
 - **C++**: Arduino core, Keyboard.h, Mouse.h, HardwareSerial
 
-## Development Phases
-1. **Phase 1**: Environment setup and basic "hello world" validation
-2. **Phase 2**: UART communication between Pi and Teensy
-3. **Phase 3**: Input capture on Pi (evdev)
-4. **Phase 4**: USB HID output on Teensy
+## Development Phases - CURRENT: Phase 3 ✅
+1. **Phase 1**: Environment setup and basic "hello world" validation ✅
+2. **Phase 2**: UART communication between Pi and Teensy ✅  
+3. **Phase 3**: Input capture on Pi (hidapi) ✅ **← COMPLETED**
+4. **Phase 4**: USB HID output on Teensy ⏳ **← NEXT**
 5. **Phase 5**: Complete pass-through system
 6. **Phase 6**: Injection capabilities and optimization
 
-## Coding Guidelines
-- **Rust**: Use async/await patterns, proper error handling with Result<>. For serialport, use builder API (no SerialPortSettings).
+## Coding Guidelines - VERIFIED PATTERNS
+- **Rust**: Use hidapi for HID, serialport builder API, proper error handling with Result<>
 - **C++**: Arduino-style setup()/loop(), avoid blocking operations
-- **Communication**: Simple text-based protocol initially, binary later
-- **Testing**: Unit tests for Rust, serial monitor testing for Teensy
+- **Communication**: Hex-encoded HID reports via UART ("HID:00ff00..." format)
+- **Testing**: `./sync-pi.sh` for build/deploy, `hid_test` for validation
 
-## Current Phase: Phase 2 - UART Communication
-- Teensy side: Implemented command handler for "test", "ping", etc.
-- Pi side: Implement Rust UART sender/reader
 
 ## Copilot Instructions
 - **Shell Syntax**: Use only valid Windows PowerShell syntax. Chain commands with ';'. Use Out-File, Set-Content, Add-Content for file creation/editing (e.g., $content = "multi\nline\ntext"; $content | Out-File -FilePath file.txt -Encoding utf8).
