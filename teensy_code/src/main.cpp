@@ -1,8 +1,7 @@
 #include <Arduino.h>
 
 // Function declarations
-void handleKeyEvent(String event);
-void handleMouseEvent(String event);
+void handleHidReport(String hexData);
 
 void setup() {
   Serial.begin(115200);  // USB Serial for debugging
@@ -11,15 +10,16 @@ void setup() {
   pinMode(LED_BUILTIN, OUTPUT);
   digitalWrite(LED_BUILTIN, LOW);
   
-  Serial.println("[TEENSY] Phase 3: Input Event Handler");
-  Serial.println("[TEENSY] Waiting for input events from Pi...");
+  Serial.println("[TEENSY] Phase 5: Input Modification Framework");
+  Serial.println("[TEENSY] USB HID Mouse output enabled");
+  Serial.println("[TEENSY] Waiting for modified HID reports from Pi...");
 }
 
 void loop() {
   // Heartbeat
   static unsigned long lastHeartbeat = 0;
   if (millis() - lastHeartbeat > 5000) {
-    Serial.println("[HEARTBEAT] Phase 3 active - awaiting input events");
+    Serial.println("[HEARTBEAT] Phase 5 active - USB HID output ready");
     lastHeartbeat = millis();
   }
   
@@ -30,20 +30,18 @@ void loop() {
     
     Serial.printf("[UART] Received: '%s'\n", command.c_str());
     
-    // Handle Phase 3 initialization
-    if (command == "phase3_start") {
-      Serial1.println("phase3_ready");
-      Serial.println("[UART] Phase 3 initialization complete");
+    // Handle Phase 5 initialization
+    if (command == "phase5_start") {
+      Serial1.println("phase5_ready");
+      Serial.println("[UART] Phase 5 initialization complete - USB HID ready");
+      digitalWrite(LED_BUILTIN, HIGH); // Indicate ready
     }
-    // Handle keyboard events: key:KEY_A:1 (press) or key:KEY_A:0 (release)
-    else if (command.startsWith("key:")) {
-      handleKeyEvent(command);
+    // Handle HID reports: HID:001234abcd
+    else if (command.startsWith("HID:")) {
+      String hexData = command.substring(4);
+      handleHidReport(hexData);
     }
-    // Handle mouse events: mouse:REL_X:5 or mouse:REL_Y:-3
-    else if (command.startsWith("mouse:")) {
-      handleMouseEvent(command);
-    }
-    // Legacy Phase 2 commands (still supported)
+    // Legacy commands (still supported)
     else if (command == "ping") {
       Serial1.println("pong");
       Serial.println("[UART] Sent: pong");
@@ -77,44 +75,39 @@ void loop() {
   }
 }
 
-void handleKeyEvent(String event) {
-  // Parse: key:KEY_A:1 -> key = KEY_A, value = 1 (press) or 0 (release)
-  int firstColon = event.indexOf(':', 4);  // Skip "key:"
-  int secondColon = event.indexOf(':', firstColon + 1);
-  
-  if (firstColon != -1 && secondColon != -1) {
-    String keyName = event.substring(4, firstColon);
-    String valueStr = event.substring(secondColon + 1);
-    int value = valueStr.toInt();
-    
-    Serial.printf("[INPUT] Key %s %s\n", 
-                  keyName.c_str(), 
-                  value == 1 ? "PRESSED" : (value == 0 ? "RELEASED" : "REPEAT"));
-    
-    // TODO Phase 4: Convert to USB HID keyboard output
-    // For now, just acknowledge
-    Serial1.println("key_processed");
-  } else {
-    Serial.printf("[ERROR] Invalid key event format: %s\n", event.c_str());
+void handleHidReport(String hexData) {
+  // Convert hex string to bytes
+  int dataLength = hexData.length() / 2;
+  if (dataLength < 4) {
+    Serial.printf("[ERROR] HID report too short: %d bytes\n", dataLength);
+    return;
   }
-}
-
-void handleMouseEvent(String event) {
-  // Parse: mouse:REL_X:5 -> axis = REL_X, value = 5
-  int firstColon = event.indexOf(':', 6);  // Skip "mouse:"
-  int secondColon = event.indexOf(':', firstColon + 1);
   
-  if (firstColon != -1 && secondColon != -1) {
-    String axisName = event.substring(6, firstColon);
-    String valueStr = event.substring(secondColon + 1);
-    int value = valueStr.toInt();
-    
-    Serial.printf("[INPUT] Mouse %s: %d\n", axisName.c_str(), value);
-    
-    // TODO Phase 4: Convert to USB HID mouse output
-    // For now, just acknowledge
-    Serial1.println("mouse_processed");
-  } else {
-    Serial.printf("[ERROR] Invalid mouse event format: %s\n", event.c_str());
+  uint8_t hidData[8] = {0}; // Max 8 bytes for mouse report
+  
+  for (int i = 0; i < dataLength && i < 8; i++) {
+    String byteString = hexData.substring(i * 2, i * 2 + 2);
+    hidData[i] = (uint8_t)strtol(byteString.c_str(), NULL, 16);
   }
+  
+  // Parse standard mouse report format: [buttons, dx, dy, wheel]
+  uint8_t buttons = hidData[0];
+  int8_t dx = (int8_t)hidData[1];
+  int8_t dy = (int8_t)hidData[2];
+  int8_t wheel = (int8_t)hidData[3];
+  
+  Serial.printf("[HID] Buttons: 0x%02x, Movement: (%d, %d), Wheel: %d\n", 
+                buttons, dx, dy, wheel);
+  
+  Serial.printf("[HID] Parsed: buttons=0x%02x, dx=%d, dy=%d, wheel=%d\n", 
+                buttons, dx, dy, wheel);
+  
+  // TODO: Implement USB HID output 
+  // For Phase 5 testing, we'll log the received modified reports
+  // Next step: Add proper Teensy USB Mouse library integration
+  
+  Serial.println("[HID] Report processed (USB output pending)");
+  
+  // Send acknowledgment back to Pi
+  Serial1.println("hid_processed");
 }
