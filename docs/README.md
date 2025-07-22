@@ -1,77 +1,89 @@
-# KM-Box Documentation
+# KM-Box: Low-Latency Gaming Input Relay
 
-## Phase 3: Input Capture Implementation
+## 🎯 Project Overview
+A high-performance keyboard/mouse pass-through system for gaming, featuring:
+- **Raspberry Pi 5**: HID input capture & processing (Rust)
+- **Teensy 4.0**: USB HID output to gaming PC (C++)
+- **UART**: Low-latency communication between devices
 
-### Overview
-Phase 3 introduces real-time input capture from keyboard and mouse devices connected to the Raspberry Pi, with events transmitted via UART to the Teensy for processing.
-
-### Architecture
+## 🏗️ Architecture
 ```
-Input Devices → Pi (evdev) → UART → Teensy (event parser) → [Phase 4: USB HID]
-```
-
-### Dependencies Added
-- **evdev v0.12.2**: Linux input device access
-- **tokio v1.46.1**: Async runtime for non-blocking I/O
-
-### Event Protocol
-| Event Type | Format | Example | Description |
-|------------|--------|---------|-------------|
-| Key Press | `key:KEY_NAME:1` | `key:KEY_A:1` | Key pressed down |
-| Key Release | `key:KEY_NAME:0` | `key:KEY_A:0` | Key released |
-| Mouse X | `mouse:REL_X:value` | `mouse:REL_X:5` | Mouse moved right (+) or left (-) |
-| Mouse Y | `mouse:REL_Y:value` | `mouse:REL_Y:-3` | Mouse moved up (-) or down (+) |
-
-### Device Discovery
-The system automatically discovers input devices by:
-1. Scanning `/dev/input/event*` devices
-2. Filtering for devices containing "keyboard", "mouse", "trackpad", or "touchpad"
-3. Opening the first available device for monitoring
-
-### Running Phase 3
-```bash
-# On Pi (with elevated permissions for input device access)
-cd ~/km_box_project/pi_code
-sudo ./target/release/km_pi
+Input Devices → Pi (hidapi) → UART → Teensy 4.0 → Gaming PC
+     USB             Rust        GPIO        C++        USB HID
 ```
 
-### Expected Output
-```
-=== KM-Box Phase 3: Input Capture & UART Relay ===
-Initializing evdev input capture and UART communication...
+## ✅ Current Status: Phase 3 Complete
 
-✓ UART connected to Teensy at 9600 baud
-✓ Sent initialization signal to Teensy
-✓ Found 2 input device(s)
-  - /dev/input/event0: USB Optical Mouse
-  - /dev/input/event1: Dell KB216 Wired Keyboard
+### Working Components:
+- **HID Input Capture**: 99 mouse reports captured via hidapi
+- **Device Detection**: SteelSeries mouse (VID=1038, PID=183a)
+- **Git Workflow**: Push/pull sync with automated build
+- **UART Ready**: Pi GPIO 14/15 ↔ Teensy pins 0/1
 
-🎯 Starting input capture loop...
-Press keys or move mouse - events will be sent to Teensy
-Press Ctrl+C to stop
+### Binaries:
+- `km_pi`: Full HID→UART relay system
+- `hid_test`: Validation and testing utility
 
-📡 Monitoring: /dev/input/event1
-📤 key:KEY_H:1
-📤 key:KEY_H:0
-📤 key:KEY_E:1
-📤 key:KEY_E:0
-```
+## 🚀 Quick Start
 
-### Teensy Response
-```
-[HEARTBEAT] Phase 3 active - awaiting input events
-[UART] Received: 'phase3_start'
-[UART] Phase 3 initialization complete
-[INPUT] Key KEY_H PRESSED
-[INPUT] Key KEY_H RELEASED
-[INPUT] Key KEY_E PRESSED
-[INPUT] Key KEY_E RELEASED
+### Development Workflow:
+```powershell
+# 1. Edit code locally in VS Code
+# 2. Commit and push to GitHub
+git add .; git commit -m "changes"; git push
+
+# 3. Sync and build on Pi
+ssh pi5 "cd ~/km-box && ./sync-pi.sh"
+
+# 4. Test HID capture
+ssh pi5 "cd ~/km-box && sudo ./pi_code/target/release/hid_test"
 ```
 
-### Troubleshooting
-- **No devices found**: Ensure keyboard/mouse are connected to Pi USB ports
-- **Permission denied**: Run with `sudo` for `/dev/input/` access
-- **UART errors**: Verify GPIO 14/15 ↔ Teensy pins 0/1 wiring
+## 📋 Phase Progress
 
-### Next Phase
-Phase 4 will implement USB HID output on the Teensy to relay captured events to the target PC.
+| Phase | Description | Status |
+|-------|-------------|--------|
+| 1 | Environment Setup | ✅ Complete |
+| 2 | UART Communication | ✅ Complete |
+| 3 | HID Input Capture | ✅ Complete |
+| 4 | USB HID Output | ⏳ Next |
+| 5 | Full Relay System | ⏳ Pending |
+| 6 | Optimization | ⏳ Pending |
+
+## 🛠️ Technical Stack
+
+### Rust (Pi):
+- `hidapi`: HID device access
+- `serialport`: UART communication
+- `clap`: Command-line interface
+- `log`/`env_logger`: Logging
+
+### C++ (Teensy):
+- Arduino framework
+- `Mouse.h`/`Keyboard.h`: USB HID output
+- `HardwareSerial`: UART communication
+
+## 📡 Communication Protocol
+```
+Pi → Teensy: "HID:001234abcd\n"
+Format: "HID:" + hex_encoded_report + "\n"
+```
+
+## 🔧 Hardware Setup
+- **Pi GPIO 14/15** ↔ **Teensy pins 0/1** (UART)
+- **Common GND** connection required
+- **USB**: Input devices → Pi, Teensy → Gaming PC
+
+## 📁 Project Structure
+```
+km-box/
+├── pi_code/           # Rust project (HID capture)
+│   ├── src/main.rs    # Full relay system
+│   └── src/hid_test.rs # Test utility
+├── teensy_fw/         # PlatformIO project
+├── docs/              # Documentation
+└── sync-pi.sh         # Build/deploy script
+```
+
+## 🎮 Next: Phase 4
+Implement USB HID output on Teensy to complete the input relay chain.
