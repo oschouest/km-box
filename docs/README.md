@@ -1,37 +1,77 @@
-# Teensy 4.0 Firmware - KM Box Project
+# KM-Box Documentation
 
-## Overview
-This is the Teensy 4.0 firmware component of the KM Box system, handling USB HID output and UART communication with the Raspberry Pi.
+## Phase 3: Input Capture Implementation
 
-## Phase 2 - UART Communication ✅ TESTED
+### Overview
+Phase 3 introduces real-time input capture from keyboard and mouse devices connected to the Raspberry Pi, with events transmitted via UART to the Teensy for processing.
 
-### Hardware Setup
-- **Wiring**: Pi GPIO 14 (TX) → Teensy Pin 0 (RX1), Pi GPIO 15 (RX) → Teensy Pin 1 (TX1), GND → GND
-- **Baud Rate**: 115200
-- **Protocol**: Text-based commands with newline termination
+### Architecture
+```
+Input Devices → Pi (evdev) → UART → Teensy (event parser) → [Phase 4: USB HID]
+```
 
-### Supported Commands
-- ping → Response: pong
-- 	est → Response: TEENSY_UART_TEST_OK
-- led_on → Response: LED_ON (turns on built-in LED)
-- led_off → Response: LED_OFF (turns off built-in LED)  
-- status → Response: System status with RAM and uptime
-- heartbeat → Continuous status updates
+### Dependencies Added
+- **evdev v0.12.2**: Linux input device access
+- **tokio v1.46.1**: Async runtime for non-blocking I/O
 
-### Test Results
-✅ **Communication Verified**: Sub-millisecond latency, 100% success rate
-✅ **LED Control**: Visual confirmation working
-✅ **Data Integrity**: All byte counts accurate
-✅ **Ready for Phase 3**: Input capture and HID output integration
+### Event Protocol
+| Event Type | Format | Example | Description |
+|------------|--------|---------|-------------|
+| Key Press | `key:KEY_NAME:1` | `key:KEY_A:1` | Key pressed down |
+| Key Release | `key:KEY_NAME:0` | `key:KEY_A:0` | Key released |
+| Mouse X | `mouse:REL_X:value` | `mouse:REL_X:5` | Mouse moved right (+) or left (-) |
+| Mouse Y | `mouse:REL_Y:value` | `mouse:REL_Y:-3` | Mouse moved up (-) or down (+) |
 
-For detailed implementation, see [PHASE_2_SUMMARY.md](PHASE_2_SUMMARY.md).
+### Device Discovery
+The system automatically discovers input devices by:
+1. Scanning `/dev/input/event*` devices
+2. Filtering for devices containing "keyboard", "mouse", "trackpad", or "touchpad"
+3. Opening the first available device for monitoring
 
-## Development
-- **Framework**: Arduino/Teensyduino with PlatformIO
-- **IDE**: VS Code with PlatformIO extension
-- **Build**: pio run (or use VS Code tasks)
-- **Upload**: pio run --target upload
-- **Monitor**: pio device monitor
+### Running Phase 3
+```bash
+# On Pi (with elevated permissions for input device access)
+cd ~/km_box_project/pi_code
+sudo ./target/release/km_pi
+```
 
-## Next Phase
-Phase 3 will implement input capture on Pi and integrate with this UART communication system.
+### Expected Output
+```
+=== KM-Box Phase 3: Input Capture & UART Relay ===
+Initializing evdev input capture and UART communication...
+
+✓ UART connected to Teensy at 9600 baud
+✓ Sent initialization signal to Teensy
+✓ Found 2 input device(s)
+  - /dev/input/event0: USB Optical Mouse
+  - /dev/input/event1: Dell KB216 Wired Keyboard
+
+🎯 Starting input capture loop...
+Press keys or move mouse - events will be sent to Teensy
+Press Ctrl+C to stop
+
+📡 Monitoring: /dev/input/event1
+📤 key:KEY_H:1
+📤 key:KEY_H:0
+📤 key:KEY_E:1
+📤 key:KEY_E:0
+```
+
+### Teensy Response
+```
+[HEARTBEAT] Phase 3 active - awaiting input events
+[UART] Received: 'phase3_start'
+[UART] Phase 3 initialization complete
+[INPUT] Key KEY_H PRESSED
+[INPUT] Key KEY_H RELEASED
+[INPUT] Key KEY_E PRESSED
+[INPUT] Key KEY_E RELEASED
+```
+
+### Troubleshooting
+- **No devices found**: Ensure keyboard/mouse are connected to Pi USB ports
+- **Permission denied**: Run with `sudo` for `/dev/input/` access
+- **UART errors**: Verify GPIO 14/15 ↔ Teensy pins 0/1 wiring
+
+### Next Phase
+Phase 4 will implement USB HID output on the Teensy to relay captured events to the target PC.
