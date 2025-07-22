@@ -133,3 +133,39 @@ km-box/
 - VS Code tasks configured: Build, Upload, Monitor, SSH tests
 - IntelliSense fully working with no more red squiggles
 
+## Phase 2 Results - ✅ COMPLETED
+
+### Pi-side Implementation:
+- ✅ SSH alias "pi5" configured and working (otis@192.168.1.117)
+- ✅ Updated Rust code with proper serialport builder pattern (serialport = "4.2")
+- ✅ Pi UART communication code implemented in main.rs
+- ✅ Code successfully synced to Pi and built in release mode (0.37s)
+- ✅ User "otis" confirmed in dialout group for serial access
+- ✅ /dev/serial0 available and linked to ttyAMA10
+
+### VS Code Configuration:
+- ✅ Updated tasks.json with correct "pi5" SSH alias 
+- ✅ Added comprehensive Pi development tasks:
+  - "Sync Pi Code to Pi" (scp to Pi)
+  - "Build Rust on Pi" (remote cargo build --release)
+  - "Run Rust on Pi" (remote execution with sudo)
+  - "Test SSH to Pi" (connection verification)
+
+### Pi UART Code Features:
+- ✅ Opens /dev/serial0 at 115200 baud using serialport builder
+- ✅ Sends commands in sequence: ping, test, led_on, led_off, status
+- ✅ Reads and displays Teensy responses with byte counts
+- ✅ 2-second intervals between commands with proper error handling
+- ✅ Clear hardware wiring instructions displayed on startup
+
+### Build Status:
+- **Pi Rust**: Build successful (0.37s) in release mode
+- **Teensy C++**: Previous build successful (3.16s, 17KB flash)
+
+### Next Steps:
+1. Upload Teensy firmware: Use "Upload to Teensy" task
+2. Start serial monitor: Use "Monitor Teensy Serial" task  
+3. Connect hardware: Pi GPIO 14→Teensy Pin 0, Pi GPIO 15→Teensy Pin 1, GND→GND
+4. Run Pi UART test: Use "Run Rust on Pi" task
+5. Verify bidirectional communication in Serial Monitor
+
