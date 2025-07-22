@@ -105,7 +105,6 @@ km-box/
 - **Shell Syntax**: Use only valid Windows PowerShell syntax. Chain commands with ';'. Use Out-File, Set-Content, Add-Content for file creation/editing (e.g., $content = "multi\nline\ntext"; $content | Out-File -FilePath file.txt -Encoding utf8).
 - **No Bash**: Do not use bash heredocs (<< 'EOF'), '&&', '|', or Linux redirects (> file). Use PowerShell equivalents (e.g., New-Item, Remove-Item -Recurse -Force).
 - **SSH/SCP**: Always use "pi5" alias for SSH/SCP (e.g., ssh pi5 "command", scp local_file pi5:~/remote_path). For multi-line files on Pi, use Set-Content via SSH or scp from local.
-- **File Sync to Pi**: For syncing pi_code to Pi, use scp -r pi_code/ pi5:~/km_box_project/km_pi/
 - **Error Handling**: If a command fails, suggest the fixed PowerShell version. Test commands in your response.
 - **Output**: Provide exact, testable commands. For code changes, output full file contents. Always end your response with a "Current State Summary" section including: - Excerpt from last 3 sections of project_log.md - Git status (run git status) - List of root folders/files (run Get-ChildItem -Path . -Recurse -Depth 1) - Folder tree (run Get-ChildItem -Recurse | Tree or simulate tree output) - Any recent errors/snippets.
 - **Process**: Implement one phase at a time. Output: 1. Code changes (paths, contents). 2. Build/deploy commands. 3. Test steps. 4. Log updates (append to project_log.md). 5. README updates. 6. Commit message. Automatically append to project_log.md after each phase.
