@@ -1,12 +1,16 @@
 {
     "folders": [
         {
-            "name": "teensy_fw",
-            "path": "./teensy_fw"
+            "name": "teensy_code",
+            "path": "./teensy_code"
         },
         {
-            "name": "pi_passthrough", 
-            "path": "./pi_passthrough"
+            "name": "pi_code", 
+            "path": "./pi_code"
+        },
+        {
+            "name": "docs",
+            "path": "./docs"
         }
     ],
     "settings": {
@@ -15,7 +19,8 @@
         "platformio-ide.autoRebuildAutocompleteIndex": true,
         "files.associations": {
             "platformio.ini": "ini"
-        }
+        },
+        "terminal.integrated.cwd": ""
     },
     "extensions": {
         "recommendations": [
