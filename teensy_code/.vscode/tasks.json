@@ -1,0 +1,119 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Sync Pi Code to Raspberry Pi",
+			"type": "shell",
+			"command": "rsync",
+			"args": [
+				"-avz",
+				"--delete",
+				"--exclude=__pycache__",
+				"--exclude=*.pyc",
+				"../pi_passthrough/",
+				"pi@raspberrypi:~/km-box/"
+			],
+			"group": "build",
+			"presentation": {
+				"echo": true,
+				"reveal": "always",
+				"focus": false,
+				"panel": "shared",
+				"showReuseMessage": true,
+				"clear": false
+			},
+			"problemMatcher": [],
+			"options": {
+				"cwd": "${workspaceFolder}"
+			}
+		},
+		{
+			"label": "Sync and Run Python Script on Pi",
+			"type": "shell",
+			"command": "powershell",
+			"args": [
+				"-Command",
+				"$syncResult = rsync -avz --delete --exclude=__pycache__ --exclude=*.pyc ../pi_passthrough/ pi@raspberrypi:~/km-box/; if ($LASTEXITCODE -eq 0) { Write-Host 'Sync successful, running script...'; ssh pi@raspberrypi 'cd ~/km-box; python3 send_serial_test.py' } else { Write-Host 'Sync failed' -ForegroundColor Red }"
+			],
+			"group": "build",
+			"presentation": {
+				"echo": true,
+				"reveal": "always",
+				"focus": false,
+				"panel": "shared",
+				"showReuseMessage": true,
+				"clear": false
+			},
+			"problemMatcher": [],
+			"options": {
+				"cwd": "${workspaceFolder}"
+			}
+		},
+		{
+			"label": "Install Dependencies on Pi",
+			"type": "shell",
+			"command": "ssh",
+			"args": [
+				"pi@raspberrypi",
+				"cd ~/km-box && pip3 install -r requirements.txt"
+			],
+			"group": "build",
+			"presentation": {
+				"echo": true,
+				"reveal": "always",
+				"focus": false,
+				"panel": "shared",
+				"showReuseMessage": true,
+				"clear": false
+			},
+			"problemMatcher": [],
+			"options": {
+				"cwd": "${workspaceFolder}"
+			}
+		},
+		{
+			"label": "Run Python Script on Pi",
+			"type": "shell",
+			"command": "ssh",
+			"args": [
+				"pi@raspberrypi",
+				"cd ~/km-box && python3 send_serial_test.py"
+			],
+			"group": "build",
+			"presentation": {
+				"echo": true,
+				"reveal": "always",
+				"focus": false,
+				"panel": "shared",
+				"showReuseMessage": true,
+				"clear": false
+			},
+			"problemMatcher": [],
+			"options": {
+				"cwd": "${workspaceFolder}"
+			}
+		},
+		{
+			"label": "Sync and Run (Simple)",
+			"type": "shell",
+			"command": "cmd",
+			"args": [
+				"/c",
+				"rsync -avz --delete --exclude=__pycache__ --exclude=*.pyc ../pi_passthrough/ pi@raspberrypi:~/km-box/ && ssh pi@raspberrypi \"cd ~/km-box && python3 send_serial_test.py\""
+			],
+			"group": "build",
+			"presentation": {
+				"echo": true,
+				"reveal": "always",
+				"focus": false,
+				"panel": "shared",
+				"showReuseMessage": true,
+				"clear": false
+			},
+			"problemMatcher": [],
+			"options": {
+				"cwd": "${workspaceFolder}"
+			}
+		}
+	]
+}

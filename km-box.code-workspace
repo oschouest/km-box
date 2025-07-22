@@ -1,0 +1,27 @@
+{
+    "folders": [
+        {
+            "name": "teensy_fw",
+            "path": "./teensy_fw"
+        },
+        {
+            "name": "pi_passthrough", 
+            "path": "./pi_passthrough"
+        }
+    ],
+    "settings": {
+        "python.defaultInterpreterPath": "/usr/bin/python3",
+        "python.terminal.activateEnvironment": true,
+        "platformio-ide.autoRebuildAutocompleteIndex": true,
+        "files.associations": {
+            "platformio.ini": "ini"
+        }
+    },
+    "extensions": {
+        "recommendations": [
+            "platformio.platformio-ide",
+            "ms-python.python",
+            "ms-vscode.cpptools"
+        ]
+    }
+}
