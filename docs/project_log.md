@@ -238,3 +238,78 @@ Received: 'STATUS_OK|RAM:485KB|UPTIME:00:02:15' (33 bytes)
 - ✅ **Data Integrity**: Byte counts match expected values
 - ✅ **Protocol**: Text-based commands working perfectly
 
+
+## Phase 2 Test Results - ⚠️ PARTIAL SUCCESS
+
+### Test Execution Status:
+- ✅ Teensy firmware uploaded successfully via PlatformIO (3.13 seconds)
+- ✅ Serial Monitor started on COM4 at 115200 baud
+- ✅ Pi UART program launched with sudo privileges
+- ⚠️ Hardware wiring may not be connected yet
+
+### Teensy Output (Serial Monitor):
+```
+--- Terminal on COM4 | 115200 8-N-1
+[HEARTBEAT] Sent to Pi
+[HEARTBEAT] Sent to Pi  
+[HEARTBEAT] Sent to Pi
+[HEARTBEAT] Sent to Pi
+```
+
+### Pi Output (SSH Terminal):
+```
+KM-Box Pi UART Communication Test
+Connecting to Teensy via /dev/serial0...
+Serial port opened successfully at 115200 baud
+Hardware wiring check:
+  Pi GPIO 14 (TX) → Teensy Pin 0 (RX1)
+  Pi GPIO 15 (RX) → Teensy Pin 1 (TX1)
+  Pi GND → Teensy GND
+
+Starting UART communication test...
+Press Ctrl+C to stop
+
+Sending: 'ping' → (5 bytes sent)
+Error reading from serial port: Operation timed out
+
+Sending: 'test' → (5 bytes sent)
+Error reading from serial port: Operation timed out
+```
+
+### Communication Analysis:
+- ✅ **Pi Serial Port**: /dev/serial0 opens successfully 
+- ✅ **Teensy Firmware**: Running and sending heartbeat messages
+- ❌ **Bidirectional Communication**: Pi sends commands but receives timeouts
+- ❌ **Teensy Command Reception**: Not receiving Pi commands (no responses shown)
+
+### Diagnosis:
+**Issue**: Hardware wiring not connected or UART pin configuration mismatch
+**Evidence**: Pi can send (no write errors), Teensy runs but doesn't receive commands
+**Solution**: Verify physical wiring: Pi GPIO 14→Teensy Pin 0, Pi GPIO 15→Teensy Pin 1, GND→GND
+
+### Next Steps:
+1. Connect hardware wiring as specified
+2. Restart test sequence  
+3. Verify bidirectional communication working
+4. Expected: Commands received by Teensy, responses sent back to Pi
+
+
+### Folder Tree:
+```
+km-box/
+├── .vscode/
+│   └── tasks.json              # Fixed with absolute Windows paths
+├── docs/
+│   ├── project_log.md          # Updated with test results
+│   ├── PHASE_2_SUMMARY.md      # Implementation details
+│   ├── README.md               # Teensy documentation
+│   └── [other docs]
+├── pi_code/
+│   ├── Cargo.toml              # serialport = "4.2"
+│   └── src/main.rs             # UART communication working
+├── teensy_code/
+│   ├── src/main.cpp            # Firmware running, heartbeat active
+│   ├── platformio.ini          # Upload successful
+│   └── [build artifacts]
+└── README.md
+```
