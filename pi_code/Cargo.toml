@@ -5,6 +5,10 @@ edition = "2021"
 
 [dependencies]
 serialport = "4.2"
-evdev = "0.12.2"
 tokio = { version = "1.0", features = ["full"] }
 clap = { version = "4.0", features = ["derive"] }
+async-hid = "0.2"
+hidreport = "0.8"
+log = "0.4"
+env_logger = "0.11"
+hex = "0.4"
