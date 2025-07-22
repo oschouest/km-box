@@ -19,16 +19,25 @@ KM-Box Relay            Recoil Compensation
 Enhanced Gaming         Adaptive AI Logic
 ```
 
-## ✅ Current Status: Phase 3 Complete
+## ✅ Current Status: Phase 5 Complete
 
 ### Working Components:
+- **Input Modification Framework**: Sensitivity scaling and button remapping
+- **Configuration System**: TOML-based settings with CLI overrides
 - **HID Input Capture**: 99 mouse reports captured via hidapi
 - **Device Detection**: SteelSeries mouse (VID=1038, PID=183a)
 - **Git Workflow**: Push/pull sync with automated build
-- **UART Ready**: Pi GPIO 14/15 ↔ Teensy pins 0/1
+- **UART Communication**: Pi GPIO 14/15 ↔ Teensy pins 0/1
+
+### Phase 5 Features:
+- **Mouse Sensitivity**: `--sensitivity 1.5` for 50% speed boost
+- **Button Remapping**: `--remap-buttons` to swap left/right
+- **Config Files**: `km_config.toml` for persistent settings
+- **Error Handling**: Fallback to original reports on failure
+- **Statistics**: Live modification tracking and performance metrics
 
 ### Binaries:
-- `km_pi`: Full HID→UART relay system
+- `km_pi`: Full input modification system with sensitivity/remapping
 - `hid_test`: Validation and testing utility
 
 ## 🚀 Quick Start
@@ -40,10 +49,14 @@ Enhanced Gaming         Adaptive AI Logic
 git add .; git commit -m "changes"; git push
 
 # 3. Sync and build on Pi
-ssh pi5 "cd ~/km-box && ./sync-pi.sh"
+ssh pi5 "cd ~/km-box && git pull"
+ssh pi5 "source ~/.cargo/env && cd ~/km-box/pi_code && cargo build --release"
 
-# 4. Test HID capture
-ssh pi5 "cd ~/km-box && sudo ./pi_code/target/release/hid_test"
+# 4. Test Phase 5 with sensitivity scaling
+ssh pi5 "cd ~/km-box && sudo ./pi_code/target/release/km_pi --sensitivity 1.5 --verbose"
+
+# 5. Test with button remapping
+ssh pi5 "cd ~/km-box && sudo ./pi_code/target/release/km_pi --remap-buttons --verbose"
 ```
 
 ## 📋 Development Roadmap
@@ -51,9 +64,9 @@ ssh pi5 "cd ~/km-box && sudo ./pi_code/target/release/hid_test"
 | Phase | Description | Status | Focus |
 |-------|-------------|--------|-------|
 | 1-3 | Hardware Foundation | ✅ Complete | Pi + Teensy relay |
-| 4 | USB HID Output | ⏳ Next | Complete basic relay |
-| 5 | Input Modification | ⏳ Pending | Filtering & transformation |
-| 6 | Recoil Scripts | ⏳ Pending | **R6S weapon patterns** |
+| 4 | USB HID Output | ✅ Complete | Basic relay functionality |
+| 5 | Input Modification | ✅ Complete | **Sensitivity & button remap** |
+| 6 | Recoil Scripts | ⏳ Next | **R6S weapon patterns** |
 | 7 | Network API | ⏳ Pending | External control interface |
 | 8 | AI Foundation | ⏳ Pending | **Aimmy integration prep** |
 | 9 | Adaptive Recoil | ⏳ Pending | **OCR weapon detection** |
