@@ -1,16 +1,75 @@
-use std::io::{self, Write};
+use std::io::Write;
 use std::time::Duration;
-use evdev::{Device, InputEventKind};
+use async_hid::{HidResult, DeviceInfo, AsyncHidRead, HidBackend};
 use serialport::SerialPort;
 use tokio::time::sleep;
+use tokio::sync::mpsc;
+use clap::Parser;
+use log::{info, warn, error, debug};
+
+#[derive(Parser, Debug)]
+#[command(name = "km_pi")]
+#[command(about = "KM-Box Phase 3: HID Input Capture & UART Relay")]
+struct Args {
+    /// Target mouse vendor ID (hex)
+    #[arg(long, default_value = "0x1038")]
+    mouse_vid: String,
+
+    /// Target mouse product ID (hex)  
+    #[arg(long, default_value = "0x1384")]
+    mouse_pid: String,
+
+    /// Enable verbose logging
+    #[arg(short, long)]
+    verbose: bool,
+
+    /// List all available HID devices and exit
+    #[arg(long)]
+    list_devices: bool,
+}
+
+#[derive(Debug)]
+enum InputEvent {
+    Mouse(String),
+    Keyboard(String),
+}
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    println!("=== KM-Box Phase 3: Input Capture & UART Relay ===");
-    println!("Initializing evdev input capture and UART communication...\n");
+    let args = Args::parse();
+    
+    // Setup logging
+    if args.verbose {
+        env_logger::init();
+    }
+    
+    info!("=== KM-Box Phase 3: Async HID Input Capture & UART Relay ===");
+    info!("Initializing async-hid input capture and UART communication...");
+
+    // List devices if requested
+    if args.list_devices {
+        info!("Enumerating all HID devices...");
+        let backend = HidBackend::new()?;
+        let devices = backend.enumerate()?;
+        
+        for device in devices {
+            println!("Device: VID={:04x} PID={:04x} Usage={:04x} Path={:?}", 
+                device.vendor_id(), device.product_id(), device.usage(), device.path());
+        }
+        return Ok(());
+    }
+
+    // Parse target VIDs/PIDs
+    let mouse_vid = u16::from_str_radix(&args.mouse_vid.trim_start_matches("0x"), 16)?;
+    let mouse_pid = u16::from_str_radix(&args.mouse_pid.trim_start_matches("0x"), 16)?;
+    
+    info!("Target mouse: VID={:04x} PID={:04x}", mouse_vid, mouse_pid);
+
+    // Setup UART communication channel
+    let (tx, mut rx) = mpsc::channel::<InputEvent>(100);
 
     // Open UART connection to Teensy
-    let mut uart_port = serialport::new("/dev/ttyAMA0", 9600)
+    let uart_port = serialport::new("/dev/ttyAMA0", 9600)
         .timeout(Duration::from_millis(100))
         .data_bits(serialport::DataBits::Eight)
         .parity(serialport::Parity::None)
@@ -18,117 +77,141 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .flow_control(serialport::FlowControl::None)
         .open()
         .map_err(|e| {
-            eprintln!("Failed to open UART /dev/ttyAMA0: {}", e);
-            eprintln!("Hardware check: Pi GPIO 14/15 ↔ Teensy pins 0/1, GND connected");
+            error!("Failed to open UART /dev/ttyAMA0: {}", e);
+            error!("Hardware check: Pi GPIO 14/15 ↔ Teensy pins 0/1, GND connected");
             e
         })?;
 
-    println!("✓ UART connected to Teensy at 9600 baud");
+    info!("✓ UART connected to Teensy at 9600 baud");
 
     // Send initialization ping to Teensy
-    let init_msg = "phase3_start\n";
-    uart_port.write_all(init_msg.as_bytes())?;
-    uart_port.flush()?;
-    println!("✓ Sent initialization signal to Teensy");
+    let init_msg = "phase3_async_start\n";
+    let mut uart_clone = uart_port.try_clone()?;
+    uart_clone.write_all(init_msg.as_bytes())?;
+    uart_clone.flush()?;
+    info!("✓ Sent initialization signal to Teensy");
 
-    // Discover input devices
-    let input_devices = discover_input_devices().await?;
-    if input_devices.is_empty() {
-        eprintln!("No suitable input devices found in /dev/input/");
-        eprintln!("Make sure keyboard/mouse are connected to Pi");
-        return Ok(());
-    }
+    // Start mouse monitoring task
+    let mouse_tx = tx.clone();
+    let mouse_task = tokio::spawn(async move {
+        if let Err(e) = monitor_mouse_device(mouse_vid, mouse_pid, mouse_tx).await {
+            error!("Mouse monitoring failed: {}", e);
+        }
+    });
 
-    println!("✓ Found {} input device(s)", input_devices.len());
-    for (path, name) in &input_devices {
-        println!("  - {}: {}", path, name);
-    }
+    // Start keyboard monitoring task (using generic HID keyboard usage)
+    let keyboard_tx = tx.clone();
+    let keyboard_task = tokio::spawn(async move {
+        if let Err(e) = monitor_keyboard_device(keyboard_tx).await {
+            error!("Keyboard monitoring failed: {}", e);
+        }
+    });
 
-    // Start input capture loop
-    println!("\n🎯 Starting input capture loop...");
-    println!("Press keys or move mouse - events will be sent to Teensy");
-    println!("Press Ctrl+C to stop\n");
-
-    // Open first available input device for testing
-    if let Some((device_path, _)) = input_devices.first() {
-        let mut device = Device::open(device_path)?;
-        println!("📡 Monitoring: {}", device_path);
-
-        loop {
-            // Non-blocking event read with timeout
-            let events = device.fetch_events();
-            match events {
-                Ok(events) => {
-                    for event in events {
-                        if let InputEventKind::Key(key) = event.kind() {
-                            let message = format!("key:{:?}:{}\n", key, event.value());
-                            send_to_teensy(&mut uart_port, &message).await?;
-                        } else if let InputEventKind::RelAxis(axis) = event.kind() {
-                            let message = format!("mouse:{:?}:{}\n", axis, event.value());
-                            send_to_teensy(&mut uart_port, &message).await?;
-                        }
-                    }
-                }
-                Err(_) => {
-                    // No events available, small delay to prevent busy loop
-                    sleep(Duration::from_millis(10)).await;
-                }
+    // UART relay task
+    let uart_task = tokio::spawn(async move {
+        let mut uart = uart_port;
+        while let Some(event) = rx.recv().await {
+            if let Err(e) = send_to_teensy(&mut uart, event).await {
+                error!("UART send failed: {}", e);
             }
         }
-    }
+    });
+
+    info!("✓ All monitoring tasks started");
+    info!("Monitoring for input events... Press Ctrl+C to stop");
+
+    // Wait for all tasks (they run indefinitely unless error)
+    tokio::try_join!(mouse_task, keyboard_task, uart_task)?;
 
     Ok(())
 }
 
-async fn discover_input_devices() -> Result<Vec<(String, String)>, Box<dyn std::error::Error>> {
-    let mut devices = Vec::new();
+async fn monitor_mouse_device(vid: u16, pid: u16, tx: mpsc::Sender<InputEvent>) -> HidResult<()> {
+    info!("🖱️ Starting mouse monitor for VID={:04x} PID={:04x}", vid, pid);
     
-    // Scan /dev/input/event* devices
-    for entry in std::fs::read_dir("/dev/input/")? {
-        let entry = entry?;
-        let path = entry.path();
-        
-        if let Some(filename) = path.file_name() {
-            if let Some(filename_str) = filename.to_str() {
-                if filename_str.starts_with("event") {
-                    let path_str = path.to_string_lossy().to_string();
-                    
-                    // Try to open device to get its name
-                    match Device::open(&path_str) {
-                        Ok(device) => {
-                            let name = device.name().unwrap_or("Unknown Device").to_string();
-                            
-                            // Filter for keyboards and mice
-                            let name_lower = name.to_lowercase();
-                            if name_lower.contains("keyboard") || 
-                               name_lower.contains("mouse") || 
-                               name_lower.contains("trackpad") ||
-                               name_lower.contains("touchpad") {
-                                devices.push((path_str, name));
-                            }
-                        }
-                        Err(_) => {
-                            // Device might be busy or require elevated permissions
-                            continue;
-                        }
-                    }
+    let backend = HidBackend::new()?;
+    let devices = backend.enumerate()?;
+    
+    // Find target mouse device
+    let mouse_device = devices.into_iter()
+        .find(|d| d.vendor_id() == vid && d.product_id() == pid)
+        .ok_or_else(|| format!("Mouse device not found: VID={:04x} PID={:04x}", vid, pid))?;
+    
+    info!("✓ Found mouse device: {:?}", mouse_device.path());
+    
+    let mut device = backend.open_device(&mouse_device)?;
+    
+    loop {
+        match device.read().await {
+            Ok(data) => {
+                debug!("Mouse HID report: {:?}", data);
+                let hex_data = hex::encode(&data);
+                let message = format!("MOUSE:{}", hex_data);
+                
+                if let Err(e) = tx.send(InputEvent::Mouse(message)).await {
+                    error!("Failed to send mouse event: {}", e);
+                    break;
                 }
+            }
+            Err(e) => {
+                warn!("Mouse read error: {}", e);
+                sleep(Duration::from_millis(100)).await;
             }
         }
     }
     
-    Ok(devices)
+    Ok(())
 }
 
-async fn send_to_teensy(port: &mut Box<dyn SerialPort>, message: &str) -> Result<(), Box<dyn std::error::Error>> {
-    print!("📤 {}", message.trim());
-    std::io::stdout().flush()?;
+async fn monitor_keyboard_device(tx: mpsc::Sender<InputEvent>) -> HidResult<()> {
+    info!("⌨️ Starting keyboard monitor for generic HID keyboard");
     
-    port.write_all(message.as_bytes())?;
-    port.flush()?;
+    let backend = HidBackend::new()?;
+    let devices = backend.enumerate()?;
     
-    // Brief delay to prevent overwhelming the UART
-    sleep(Duration::from_millis(5)).await;
+    // Find a keyboard device (usage 0x0106 = keyboard)
+    let keyboard_device = devices.into_iter()
+        .find(|d| d.usage() == 0x0106)
+        .ok_or_else(|| "No HID keyboard found")?;
+    
+    info!("✓ Found keyboard device: VID={:04x} PID={:04x} Usage={:04x}", 
+          keyboard_device.vendor_id(), keyboard_device.product_id(), keyboard_device.usage());
+    
+    let mut device = backend.open_device(&keyboard_device)?;
+    
+    loop {
+        match device.read().await {
+            Ok(data) => {
+                debug!("Keyboard HID report: {:?}", data);
+                let hex_data = hex::encode(&data);
+                let message = format!("KEYBOARD:{}", hex_data);
+                
+                if let Err(e) = tx.send(InputEvent::Keyboard(message)).await {
+                    error!("Failed to send keyboard event: {}", e);
+                    break;
+                }
+            }
+            Err(e) => {
+                warn!("Keyboard read error: {}", e);
+                sleep(Duration::from_millis(100)).await;
+            }
+        }
+    }
+    
+    Ok(())
+}
+
+async fn send_to_teensy(uart: &mut Box<dyn SerialPort>, event: InputEvent) -> Result<(), Box<dyn std::error::Error>> {
+    let message = match event {
+        InputEvent::Mouse(data) => data,
+        InputEvent::Keyboard(data) => data,
+    };
+    
+    debug!("Sending to Teensy: {}", message);
+    
+    uart.write_all(message.as_bytes())?;
+    uart.write_all(b"\n")?;
+    uart.flush()?;
     
     Ok(())
 }
