@@ -91,8 +91,10 @@ impl MouseReport {
     }
 
     fn to_bytes(&self) -> Vec<u8> {
-        // Send in simple 4-byte format for Teensy
-        vec![self.buttons, self.dx as u8, self.dy as u8, self.wheel as u8]
+        // Send the raw 9-byte format that Teensy expects
+        let dx_bytes = (self.dx as i16).to_le_bytes();
+        let dy_bytes = (self.dy as i16).to_le_bytes();
+        vec![0x00, dx_bytes[0], dx_bytes[1], dy_bytes[0], dy_bytes[1], self.buttons, self.wheel as u8, 0x00, 0x00]
     }
 }
 
