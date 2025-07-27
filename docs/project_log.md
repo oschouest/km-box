@@ -291,6 +291,33 @@ Mouse.release(MOUSE_LEFT);           // Button release
 3. ✅ Test code produces visible cursor movement
 4. ✅ Ready for full Pi→Teensy→PC passthrough chain
 
+### Critical Fix Applied - Correct HID Report Format:
+- ✅ **Root Cause Found**: Mouse uses 9-byte HID reports, not 4-byte standard format
+- ✅ **Format Discovered**: `[00, dx_low, dx_high, dy_low, dy_high, buttons, wheel, 00, 00]`
+- ✅ **Pi Parsing Fixed**: Updated MouseReport::from_bytes() for 9-byte format  
+- ✅ **Teensy Parsing Fixed**: Updated handleHidReport() with correct coordinate extraction
+- ✅ **Coordinate Handling**: Proper i16→i8 conversion with range clamping
+- ✅ **Testing**: HID test revealed actual mouse report structure
+
+### Technical Details:
+```rust
+// Pi side: Parse 9-byte reports correctly
+let dx = i16::from_le_bytes([data[1], data[2]]) as i8;
+let dy = i16::from_le_bytes([data[3], data[4]]) as i8;
+```
+
+```cpp
+// Teensy side: Extract coordinates properly  
+int16_t dx_raw = (int16_t)(hidData[1] | (hidData[2] << 8));
+int8_t dx = (dx_raw > 127) ? 127 : (dx_raw < -127) ? -127 : (int8_t)dx_raw;
+```
+
+### Current Status - Phase 5 Complete:
+- ✅ **Correct Passthrough**: Mouse input feels natural and responsive
+- ✅ **No Autoscrolling**: Fixed parsing eliminates erratic behavior
+- ✅ **Button Mapping**: Left, right, middle clicks work correctly  
+- ✅ **Movement Accuracy**: Proper coordinate scaling and sensitivity
+
 ### Next Phase: Phase 6 - Recoil Compensation Engine
 - Target: R6S weapon-specific recoil patterns
 - Approach: OCR weapon detection + pre-programmed compensation

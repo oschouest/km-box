@@ -18,18 +18,10 @@ void setup() {
 }
 
 void loop() {
-  // TEST CODE: Verify USB HID mouse functionality
-  static unsigned long lastTest = 0;
-  if (millis() - lastTest > 500) {
-    Mouse.move(5, 5);
-    Serial.println("[TEST] Mouse moved 5,5 - verify cursor movement on PC");
-    lastTest = millis();
-  }
-  
-  // Heartbeat
+  // Heartbeat (reduced frequency for production)
   static unsigned long lastHeartbeat = 0;
-  if (millis() - lastHeartbeat > 5000) {
-    Serial.println("[HEARTBEAT] Phase 5 active - USB HID output ready");
+  if (millis() - lastHeartbeat > 10000) {
+    Serial.println("[HEARTBEAT] Phase 5 active - USB HID passthrough ready");
     lastHeartbeat = millis();
   }
   
@@ -88,29 +80,31 @@ void loop() {
 void handleHidReport(String hexData) {
   // Convert hex string to bytes
   int dataLength = hexData.length() / 2;
-  if (dataLength < 4) {
-    Serial.printf("[ERROR] HID report too short: %d bytes\n", dataLength);
+  if (dataLength < 9) {
+    Serial.printf("[ERROR] HID report too short: %d bytes (expected 9)\n", dataLength);
     return;
   }
   
-  uint8_t hidData[8] = {0}; // Max 8 bytes for mouse report
+  uint8_t hidData[9] = {0}; // 9-byte mouse report
   
-  for (int i = 0; i < dataLength && i < 8; i++) {
+  for (int i = 0; i < dataLength && i < 9; i++) {
     String byteString = hexData.substring(i * 2, i * 2 + 2);
     hidData[i] = (uint8_t)strtol(byteString.c_str(), NULL, 16);
   }
   
-  // Parse standard mouse report format: [buttons, dx, dy, wheel]
-  uint8_t buttons = hidData[0];
-  int8_t dx = (int8_t)hidData[1];
-  int8_t dy = (int8_t)hidData[2];
-  int8_t wheel = (int8_t)hidData[3];
+  // Parse 9-byte HID report format: [00, dx_low, dx_high, dy_low, dy_high, buttons, wheel, 00, 00]
+  int16_t dx_raw = (int16_t)(hidData[1] | (hidData[2] << 8));
+  int16_t dy_raw = (int16_t)(hidData[3] | (hidData[4] << 8));
+  uint8_t buttons = hidData[5];
+  int8_t wheel = (int8_t)hidData[6];
   
-  Serial.printf("[HID] Buttons: 0x%02x, Movement: (%d, %d), Wheel: %d\n", 
-                buttons, dx, dy, wheel);
+  // Convert to i8 range for Mouse.move()
+  int8_t dx = (dx_raw > 127) ? 127 : (dx_raw < -127) ? -127 : (int8_t)dx_raw;
+  int8_t dy = (dy_raw > 127) ? 127 : (dy_raw < -127) ? -127 : (int8_t)dy_raw;
   
-  Serial.printf("[HID] Parsed: buttons=0x%02x, dx=%d, dy=%d, wheel=%d\n", 
-                buttons, dx, dy, wheel);
+  Serial.printf("[HID] 9-byte format: dx_raw=%d, dy_raw=%d, buttons=0x%02x, wheel=%d\n", 
+                dx_raw, dy_raw, buttons, wheel);
+  Serial.printf("[HID] Clamped: dx=%d, dy=%d\n", dx, dy);
   
   // Send USB HID mouse report
   sendMouseReport(buttons, dx, dy, wheel);

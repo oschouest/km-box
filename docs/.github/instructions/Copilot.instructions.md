@@ -96,13 +96,12 @@ km-box/
 ## Copilot Instructions
 - **Terminal Management**: ALWAYS close unnecessary terminals after operations. Use only one terminal per task. Clean up SSH sessions and background processes immediately after use. Do not leave multiple terminals running.
 - **Known Issues & Solutions**: ALWAYS check this section before attempting fixes to avoid repeating failed solutions:
-  - **Teensy USB HID WORKING SOLUTION**: Use `build_flags = -DUSB_SERIAL_HID` in platformio.ini and `#include <Mouse.h>` with Mouse.move(), Mouse.press(), Mouse.release() functions. This compiles successfully.
+  - **Teensy USB HID WORKING SOLUTION**: Use `build_flags = -DUSB_SERIAL_HID` in platformio.ini and `#include <Mouse.h>` with Mouse.move(), Mouse.press(), Mouse.release() functions. This compiles successfully and enables HID output while retaining serial logging for debugging. Verify by adding test code like `Mouse.move(5, 5); delay(500);` in loop() and checking cursor movement on the connected PC.
   - **Teensy USB HID Libraries FAILED**: Mouse.h, usb_mouse.h, usb_mouse_move(), usb_mouse_buttons() are NOT available without proper build flags. Do not attempt to use low-level usb_mouse functions without USB_SERIAL_HID flag.
   - **PlatformIO Upload Path**: Only use full absolute path: `Set-Location "c:\Users\oscho\OneDrive - OTS Consulting Management Customs\vs-code-workspace\km-box\teensy_code"` - relative paths fail
   - **PowerShell Syntax**: Use `&` operator, not `&&` or `;` for command chaining in PowerShell
   - **Serial Monitor Access**: Direct PlatformIO serial monitor often fails with permission errors - use SSH to Pi for monitoring instead
   - **Pi Cargo Path**: Use full path `~/.cargo/bin/cargo` and specify binary `--bin km_pi` for execution
-- **Teensy USB HID**: CRITICAL - Standard Arduino Mouse library and usb_mouse functions are NOT available in current PlatformIO Teensy environment. For Phase 5, use logging only. USB HID output requires custom implementation or different toolchain (research needed for Phase 6).
 - **PlatformIO Commands on Windows**: CRITICAL - Always use the correct PowerShell syntax with call operator (&). The ONLY working command is: `Set-Location "c:\Users\oscho\OneDrive - OTS Consulting Management Customs\vs-code-workspace\km-box\teensy_code"; & "C:\Users\oscho\.platformio\penv\Scripts\platformio.exe" run --target upload`. Use full absolute paths. DO NOT use semicolons (;), DO NOT use && operators, DO NOT use cd command. This has been tested and works. Any other syntax will fail.
 - **Shell Syntax**: Use only valid Windows PowerShell syntax. Chain commands with ';'. Use Out-File, Set-Content, Add-Content for file creation/editing (e.g., $content = "multi\nline\ntext"; $content | Out-File -FilePath file.txt -Encoding utf8).
 - **No Bash**: Do not use bash heredocs (<< 'EOF'), '&&', '|', or Linux redirects (> file). Use PowerShell equivalents (e.g., New-Item, Remove-Item -Recurse -Force).
@@ -111,4 +110,5 @@ km-box/
 - **Output**: Provide exact, testable commands. For code changes, output full file contents. Always end your response with a "Current State Summary" section including: - Excerpt from last 3 sections of project_log.md - Git status (run git status) - List of root folders/files (run Get-ChildItem -Path . -Recurse -Depth 1) - Folder tree (run Get-ChildItem -Recurse | Tree or simulate tree output) - Any recent errors/snippets.
 - **Process**: Implement one phase at a time. Output: 1. Code changes (paths, contents). 2. Build/deploy commands. 3. Test steps. 4. Log updates (append to project_log.md). 5. README updates. 6. Commit message. Automatically append to project_log.md after each phase.
 - **If errors, suggest fixes. Keep iterations small. After phase, generate log/README based on success; revise if tests fail.
-```
+
+

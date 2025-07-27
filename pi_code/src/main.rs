@@ -69,7 +69,18 @@ struct MouseReport {
 
 impl MouseReport {
     fn from_bytes(data: &[u8]) -> Option<Self> {
-        if data.len() >= 4 {
+        if data.len() >= 9 {
+            // Parse 9-byte HID report format: [00, dx_low, dx_high, dy_low, dy_high, buttons, wheel, 00, 00]
+            let dx = i16::from_le_bytes([data[1], data[2]]) as i8; // Convert to i8 range
+            let dy = i16::from_le_bytes([data[3], data[4]]) as i8; // Convert to i8 range
+            Some(MouseReport {
+                buttons: data[5],
+                dx,
+                dy,
+                wheel: data[6] as i8,
+            })
+        } else if data.len() >= 4 {
+            // Fallback to 4-byte format for compatibility
             Some(MouseReport {
                 buttons: data[0],
                 dx: data[1] as i8,
@@ -82,7 +93,10 @@ impl MouseReport {
     }
 
     fn to_bytes(&self) -> Vec<u8> {
-        vec![self.buttons, self.dx as u8, self.dy as u8, self.wheel as u8]
+        // Convert to 9-byte format for Teensy
+        let dx_bytes = (self.dx as i16).to_le_bytes();
+        let dy_bytes = (self.dy as i16).to_le_bytes();
+        vec![0x00, dx_bytes[0], dx_bytes[1], dy_bytes[0], dy_bytes[1], self.buttons, self.wheel as u8, 0x00, 0x00]
     }
 }
 
