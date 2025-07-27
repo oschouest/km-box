@@ -291,34 +291,25 @@ Mouse.release(MOUSE_LEFT);           // Button release
 3. ✅ Test code produces visible cursor movement
 4. ✅ Ready for full Pi→Teensy→PC passthrough chain
 
-### Critical Fix Applied - Correct HID Report Format:
-- ✅ **Root Cause Found**: Mouse uses 9-byte HID reports, not 4-byte standard format
-- ✅ **Format Discovered**: `[00, dx_low, dx_high, dy_low, dy_high, buttons, wheel, 00, 00]`
-- ✅ **Pi Parsing Fixed**: Updated MouseReport::from_bytes() for 9-byte format  
-- ✅ **Teensy Parsing Fixed**: Updated handleHidReport() with correct coordinate extraction
-- ✅ **Coordinate Handling**: Proper i16→i8 conversion with range clamping
-- ✅ **Testing**: HID test revealed actual mouse report structure
+### Current Status - Phase 5 Partial Working:
+- ✅ **Basic Passthrough**: Pi→Teensy→PC chain functional
+- ⚠️ **Input Quality**: Mouse works but not usable quality - movement issues persist
+- 🔄 **HID Parsing**: Attempted 9-byte format fix, reverted to simple parsing
+- ❌ **Usability**: Still not ready for production use
 
-### Technical Details:
-```rust
-// Pi side: Parse 9-byte reports correctly
-let dx = i16::from_le_bytes([data[1], data[2]]) as i8;
-let dy = i16::from_le_bytes([data[3], data[4]]) as i8;
-```
+### Technical Investigation Results:
+- **9-byte HID Format**: `[00, dx_low, dx_high, dy_low, dy_high, buttons, wheel, 00, 00]`
+- **Simple Parsing**: Using data[1]=dx, data[3]=dy, data[5]=buttons, data[6]=wheel
+- **Issue**: Movement still feels wrong despite correct parsing structure
+- **Root Cause**: Need better coordinate extraction or different mouse handling approach
 
-```cpp
-// Teensy side: Extract coordinates properly  
-int16_t dx_raw = (int16_t)(hidData[1] | (hidData[2] << 8));
-int8_t dx = (dx_raw > 127) ? 127 : (dx_raw < -127) ? -127 : (int8_t)dx_raw;
-```
+### Next Steps:
+1. **Debug Movement Values**: Log raw vs processed coordinates
+2. **Test Alternative Parsing**: Try different byte interpretations
+3. **Mouse Library Analysis**: Investigate Teensy Mouse.move() parameters
+4. **Consider Hardware**: May need different mouse or USB HID approach
 
-### Current Status - Phase 5 Complete:
-- ✅ **Correct Passthrough**: Mouse input feels natural and responsive
-- ✅ **No Autoscrolling**: Fixed parsing eliminates erratic behavior
-- ✅ **Button Mapping**: Left, right, middle clicks work correctly  
-- ✅ **Movement Accuracy**: Proper coordinate scaling and sensitivity
-
-### Next Phase: Phase 6 - Recoil Compensation Engine
+### Status: Phase 5 NOT Complete - Input quality issues unresolved
 - Target: R6S weapon-specific recoil patterns
 - Approach: OCR weapon detection + pre-programmed compensation
 - Integration: Aimmy AI project for visual analysis
