@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <Mouse.h>
 
 // Function declarations
 void handleHidReport(String hexData);
@@ -17,6 +18,14 @@ void setup() {
 }
 
 void loop() {
+  // TEST CODE: Verify USB HID mouse functionality
+  static unsigned long lastTest = 0;
+  if (millis() - lastTest > 500) {
+    Mouse.move(5, 5);
+    Serial.println("[TEST] Mouse moved 5,5 - verify cursor movement on PC");
+    lastTest = millis();
+  }
+  
   // Heartbeat
   static unsigned long lastHeartbeat = 0;
   if (millis() - lastHeartbeat > 5000) {
@@ -113,14 +122,51 @@ void handleHidReport(String hexData) {
 }
 
 void sendMouseReport(uint8_t buttons, int8_t dx, int8_t dy, int8_t wheel) {
-  // CRITICAL: For now, just log the HID data - we need to figure out proper USB HID later
-  // The Pi's input modification is working, Teensy receives it correctly
+  // Use proper Teensy USB HID Mouse functions
   
-  Serial.printf("[USB] HID data received: buttons=0x%02x, move=(%d,%d), wheel=%d\n", 
+  static uint8_t prevButtons = 0;
+  
+  // Send mouse movement and wheel if there's any change
+  if (dx != 0 || dy != 0 || wheel != 0) {
+    Mouse.move(dx, dy, wheel);
+    Serial.printf("[USB] Mouse moved: (%d, %d), wheel: %d\n", dx, dy, wheel);
+  }
+  
+  // Handle button changes - only send changes, not continuous state
+  uint8_t buttonChanges = buttons ^ prevButtons;
+  
+  if (buttonChanges & 0x01) { // Left button changed
+    if (buttons & 0x01) {
+      Mouse.press(MOUSE_LEFT);
+      Serial.println("[USB] Left button pressed");
+    } else {
+      Mouse.release(MOUSE_LEFT);
+      Serial.println("[USB] Left button released");
+    }
+  }
+  
+  if (buttonChanges & 0x02) { // Right button changed  
+    if (buttons & 0x02) {
+      Mouse.press(MOUSE_RIGHT);
+      Serial.println("[USB] Right button pressed");
+    } else {
+      Mouse.release(MOUSE_RIGHT);
+      Serial.println("[USB] Right button released");
+    }
+  }
+  
+  if (buttonChanges & 0x04) { // Middle button changed
+    if (buttons & 0x04) {
+      Mouse.press(MOUSE_MIDDLE);
+      Serial.println("[USB] Middle button pressed");
+    } else {
+      Mouse.release(MOUSE_MIDDLE);
+      Serial.println("[USB] Middle button released");
+    }
+  }
+  
+  prevButtons = buttons;
+  
+  Serial.printf("[USB] HID output complete: buttons=0x%02x, move=(%d,%d), wheel=%d\n", 
                 buttons, dx, dy, wheel);
-  
-  // TODO Phase 6: Implement actual USB HID output
-  // For now, this confirms the chain Pi->Teensy is working with modified input
-  
-  Serial.println("[STATUS] Phase 5 complete - input modification chain verified");
 }

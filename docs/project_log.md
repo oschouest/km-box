@@ -261,7 +261,35 @@ loop {
 - ✅ **Teensy Code**: HID report parsing (main.cpp)
 - ✅ **Configuration**: km_config.toml + CLI overrides
 - ✅ **Testing**: Live mouse input with 1.5x scaling verified
-- 🔄 **USB Output**: Teensy logs USB commands (physical output pending)
+- ✅ **USB Output**: Teensy USB HID working with -DUSB_SERIAL_HID flag + Mouse library
+
+## � **2025-07-27 - Phase 5 FINAL: USB HID Output Working**
+
+### Critical Breakthrough: Teensy USB HID Resolved
+- **Problem**: Mouse cursor not moving despite successful Pi→Teensy communication
+- **Root Cause**: PlatformIO USB configuration insufficient for HID output
+- **Solution**: Applied working solution from updated instructions:
+  1. Used `build_flags = -DUSB_SERIAL_HID` in platformio.ini
+  2. Added `#include <Mouse.h>` and test code `Mouse.move(5, 5); delay(500);`
+  3. Verified cursor movement on PC every 500ms
+  4. Integrated full HID report parsing with Mouse.move(), Mouse.press(), Mouse.release()
+
+### Technical Implementation:
+```cpp
+// Test Code (for verification)
+Mouse.move(5, 5);  // Moves cursor 5px right, 5px down every 500ms
+
+// Production Code (for full passthrough)
+Mouse.move(dx, dy, wheel);           // Movement and scroll
+Mouse.press(MOUSE_LEFT);             // Button press
+Mouse.release(MOUSE_LEFT);           // Button release
+```
+
+### Verification Steps:
+1. ✅ Firmware compiles and uploads successfully
+2. ✅ Teensy appears as "HID-compliant mouse" in Device Manager
+3. ✅ Test code produces visible cursor movement
+4. ✅ Ready for full Pi→Teensy→PC passthrough chain
 
 ### Next Phase: Phase 6 - Recoil Compensation Engine
 - Target: R6S weapon-specific recoil patterns
