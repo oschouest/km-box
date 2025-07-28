@@ -77,37 +77,16 @@ impl MouseReport {
             let raw_buttons = data[5];
             let wheel_byte = data[6] as i8;
             
-            // SteelSeries Aerox 3 SCROLL WHEEL FIX:
-            // This mouse sends 0xff for scroll wheel events instead of wheel data
-            // The actual wheel direction is in the wheel_byte (position 6)
-            let (buttons, wheel) = if raw_buttons == 0xff && dx == 0 && dy == 0 {
-                // 0xff + no movement = scroll wheel event
-                // Use the actual wheel_byte to detect direction:
-                // wheel_byte = 1 means scroll up, wheel_byte = 255 (or -1) means scroll down
-                let wheel_direction = if wheel_byte == 1 { 1 } else if wheel_byte == 255 || wheel_byte == -1 { -1 } else { 0 };
-                (0x00, wheel_direction)
-            } else if raw_buttons == 0xff {
-                // 0xff with movement = might be middle button + movement
-                // For now convert to middle button (0x04)
-                (0x04, wheel_byte)
-            } else {
-                // Normal button event
-                (raw_buttons, wheel_byte)
-            };
+            // RAW HID PASSTHROUGH - NO MODIFICATION
+            // Send exact report as captured from Aerox 3
+            let buttons = raw_buttons;
+            let wheel = wheel_byte;
             
             // Debug: Print raw HID bytes when we have movement, buttons, or wheel
             if dx != 0 || dy != 0 || raw_buttons != 0 || wheel != 0 {
                 println!("[PI_DEBUG] Raw HID: {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x}", 
                          data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7], data[8]);
-                if raw_buttons == 0xff {
-                    if dx == 0 && dy == 0 {
-                        println!("[PI_DEBUG] SCROLL: 0xff -> wheel={}", wheel);
-                    } else {
-                        println!("[PI_DEBUG] MIDDLE+MOVE: 0xff -> button=0x04");
-                    }
-                } else {
-                    println!("[PI_DEBUG] Parsed: dx={}, dy={}, buttons=0x{:02x}, wheel={}", dx, dy, buttons, wheel);
-                }
+                println!("[PI_DEBUG] Parsed: dx={}, dy={}, buttons=0x{:02x}, wheel={}", dx, dy, buttons, wheel);
             }
             
             Some(MouseReport {

@@ -1,26 +1,24 @@
 #include <Arduino.h>
-#include <Mouse.h>
+#include <usb_desc.h>
 
-// Global state tracking for buttons
-uint8_t prev_buttons = 0;
-
-// Function declarations
-void handleHidReport(String hexData);
-void sendMouseReport(uint8_t buttons, int16_t dx, int16_t dy, signed char wheel);
+// Raw HID passthrough - no Mouse.h parsing
+void handleRawHidReport(String hexData);
+void sendRawHidReport(uint8_t* report, int length);
 
 void setup() {
   Serial.begin(115200);  // USB Serial for debugging
   while (!Serial);       // Wait for serial
-  Serial1.begin(115200); // UART for Pi communication (higher baud for low latency)
+  Serial1.begin(115200); // UART for Pi communication
   
-  Mouse.begin();         // Initialize HID mouse output
+  // Initialize raw USB HID (no Mouse.begin())
+  usb_init();
   
   pinMode(LED_BUILTIN, OUTPUT);
   digitalWrite(LED_BUILTIN, LOW);
   
-  Serial.println("[TEENSY] Phase 5: Input Modification Framework");
-  Serial.println("[TEENSY] USB HID Mouse output enabled");
-  Serial.println("[TEENSY] Waiting for modified HID reports from Pi...");
+  Serial.println("[TEENSY] RAW HID PASSTHROUGH MODE");
+  Serial.println("[TEENSY] Device ID: VID=0x1038, PID=0x183a (SteelSeries Aerox 3)");
+  Serial.println("[TEENSY] Waiting for raw HID reports from Pi...");
 }
 
 void loop() {
@@ -32,13 +30,50 @@ void loop() {
     Serial.printf("[UART] Received: '%s'\n", command.c_str());
     
     if (command.startsWith("HID:")) {
-      handleHidReport(command.substring(4));
+      handleRawHidReport(command.substring(4));
     } else if (command == "INIT:PHASE5") {
-      Serial.println("[UART] Phase 5 initialization acknowledged");
-      Serial1.println("ack_phase5");
+      Serial.println("[UART] Raw HID passthrough acknowledged");
+      Serial1.println("ack_rawhid");
     } else {
       Serial.printf("[UART] Ignored non-HID: '%s'\n", command.c_str());
     }
+  }
+}
+
+void handleRawHidReport(String hexData) {
+  // Convert hex string to raw bytes
+  int dataLength = hexData.length() / 2;
+  
+  if (dataLength != 9) {
+    Serial.printf("[ERROR] Expected 9-byte report, got %d\n", dataLength);
+    return;
+  }
+
+  // Decode hex to raw bytes
+  uint8_t report[9];
+  for (int i = 0; i < 9; i++) {
+    String byteString = hexData.substring(i * 2, i * 2 + 2);
+    report[i] = strtol(byteString.c_str(), NULL, 16);
+  }
+
+  // Debug: Print raw bytes
+  Serial.printf("[RAW] ");
+  for (int i = 0; i < 9; i++) {
+    Serial.printf("%02x ", report[i]);
+  }
+  Serial.println();
+
+  // Send raw HID report directly - NO PARSING
+  sendRawHidReport(report, 9);
+}
+
+void sendRawHidReport(uint8_t* report, int length) {
+  // Send the exact same 9-byte report via USB HID
+  // This makes the Teensy appear as the original Aerox 3
+  if (usb_hid_send_report(report, length) == 0) {
+    Serial.println("[USB] Raw HID report sent successfully");
+  } else {
+    Serial.println("[USB] Failed to send raw HID report");
   }
 }
 
