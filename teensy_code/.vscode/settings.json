@@ -1,0 +1,12 @@
+{
+    "C_Cpp.default.configurationProvider": "ms-vscode.cpptools",
+    "C_Cpp.default.compileCommands": "${workspaceFolder}/compile_commands.json",
+    "files.associations": {
+        "*.ino": "cpp",
+        "arduino.h": "c",
+        "string": "cpp",
+        "iostream": "cpp"
+    },
+    "C_Cpp.intelliSenseEngine": "default",
+    "C_Cpp.errorSquiggles": "enabled"
+}
