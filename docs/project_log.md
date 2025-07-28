@@ -23,13 +23,26 @@ Enhanced Gaming Input   Adaptive AI Logic
 
 ---
 
-## ✅ Phase 5 Status: LOSSLESS HID PASS-THROUGH COMPLETE
+## ✅ Phase 5 Status: FULL HID PASS-THROUGH WITH FIXES COMPLETE
 
-**BREAKTHROUGH**: Fixed full int16 dx/dy handling for 100% pass-through accuracy
+**BREAKTHROUGH**: Fixed wheel handling and button mapping, increased sensitivity
+
+**Latest Fixes Applied**:
+- ✅ **FIXED**: Wheel event duplication - scroll now sends once per event instead of multiple times
+- ✅ **FIXED**: Added side button detection (0x08=front, 0x10=back) with logging
+- ✅ **FIXED**: Increased sensitivity from 1.0 to 2.0x to address slow mouse speed
+- ✅ **VERIFIED**: Button mapping confirmed correct via HID test:
+  - Left click = byte 5, bit 0 (0x01) ✅
+  - Right click = byte 5, bit 1 (0x02) ✅  
+  - Middle click = byte 5, bit 2 (0x04) ✅
+  - Front side = byte 5, bit 3 (0x08) ✅
+  - Back side = byte 5, bit 4 (0x10) ✅
+  - Scroll wheel = byte 6 (signed) ✅
 
 **Root Cause Resolution**:
 - ✅ **FIXED**: Pi now handles full int16 range from 9-byte HID reports
 - ✅ **FIXED**: Teensy parses full 9-byte reports with chunked movement for large deltas
+- ✅ **FIXED**: Wheel chunking loop bug that caused scroll→click conversion
 - ✅ **VERIFIED**: Button input working (buttons=02/03/01 for right/both/left)
 - ✅ **VERIFIED**: Wheel scroll working (full int8 range: wheel=-18 to +9)
 - ✅ **VERIFIED**: Large movements preserved (dx=-25, dx=14, etc.)
@@ -38,11 +51,14 @@ Enhanced Gaming Input   Adaptive AI Logic
 - **Pi Code**: Extracts full `i16::from_le_bytes([buf[1], buf[2]])` for dx/dy
 - **Pi Code**: Applies sensitivity to full int16, repacks into 9-byte buffer
 - **Teensy Code**: Parses 9-byte reports, chunked Mouse.move() for large deltas
+- **Teensy Code**: Fixed wheel handling to send once per event, not in chunking loop
 - **Protocol**: Full 18-char hex encoding preserves complete int16 range
 
 **Testing Results**:
-Fast mouse swipes now show values like dx=-25, dx=14 instead of clamped ±8
-Button clicks and scroll wheel working perfectly with full range
+- Fast mouse swipes now show values like dx=-25, dx=14 instead of clamped ±8
+- Button clicks and scroll wheel working perfectly with full range
+- Mouse speed increased to 2.0x sensitivity for better usability
+- Side buttons detected and logged (not mapped to USB yet due to Arduino library limitations)
 
 **Next Phase**: Phase 6 - Recoil Compensation Engine with OCR weapon detection
 
