@@ -121,22 +121,22 @@ void sendMouseReport(uint8_t buttons, int16_t dx, int16_t dy, signed char wheel)
     }
   }
   
-  // Handle side buttons (front = 0x08, back = 0x10)
-  // Note: Arduino Mouse library doesn't have MOUSE_SIDE constants
-  // For now, we'll log them but not send - user can remap later
+  // Handle side buttons with correct HID standard mapping per rivalcfg
+  // 0x08 = MOUSE_BACK (rear/thumb button), 0x10 = MOUSE_FORWARD (front button)
+  // Arduino Mouse library only supports 3 buttons, so log these for now
   if ((buttons & 0x08) != (prev_buttons & 0x08)) {
     if (buttons & 0x08) {
-      Serial.println("[USB] Front side button pressed (not mapped)");
+      Serial.println("[USB] BACK side button pressed (0x08 - rear/thumb button)");
     } else {
-      Serial.println("[USB] Front side button released");
+      Serial.println("[USB] BACK side button released");
     }
   }
   
   if ((buttons & 0x10) != (prev_buttons & 0x10)) {
     if (buttons & 0x10) {
-      Serial.println("[USB] Back side button pressed (not mapped)");
+      Serial.println("[USB] FORWARD side button pressed (0x10 - front button)");
     } else {
-      Serial.println("[USB] Back side button released");
+      Serial.println("[USB] FORWARD side button released");
     }
   }
   
