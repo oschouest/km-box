@@ -24,14 +24,6 @@ void setup() {
 }
 
 void loop() {
-  // Test HID output every 2 seconds with visible movement
-  static unsigned long lastTest = 0;
-  if (millis() - lastTest > 2000) {
-    Mouse.move(10, 10, 0);
-    Serial.println("[TEST] Moving cursor +10,+10 to verify HID output");
-    lastTest = millis();
-  }
-  
   // Check for incoming UART data from Pi
   if (Serial1.available()) {
     String command = Serial1.readStringUntil('\n');
@@ -39,15 +31,14 @@ void loop() {
     
     Serial.printf("[UART] Received: '%s'\n", command.c_str());
     
-    // Handle HID reports: HID:001234abcd...
     if (command.startsWith("HID:")) {
-      String hexData = command.substring(4);
-      handleHidReport(hexData);
+      handleHidReport(command.substring(4));
+    } else if (command == "INIT:PHASE5") {
+      Serial.println("[UART] Phase 5 initialization acknowledged");
+      Serial1.println("ack_phase5");
     } else {
       Serial.printf("[UART] Ignored non-HID: '%s'\n", command.c_str());
     }
-    
-    Serial1.flush(); // Ensure data is sent
   }
 }
 
@@ -75,6 +66,11 @@ void handleHidReport(String hexData) {
   }
   
   if (!parseSuccess) return;
+  
+  // Debug: Print raw report bytes
+  Serial.printf("[DEBUG] Raw report: %02x %02x %02x %02x %02x %02x %02x %02x %02x\n", 
+                report[0], report[1], report[2], report[3], report[4], 
+                report[5], report[6], report[7], report[8]);
   
   // Parse 9-byte HID report: [00, dx_low, dx_high, dy_low, dy_high, buttons, wheel, 00, 00]
   uint8_t buttons = report[5];

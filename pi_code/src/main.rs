@@ -235,7 +235,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     info!("✓ Connected to mouse device");
 
     // Setup UART connection to Teensy
-    let mut port = serialport::new("/dev/serial0", 115200)
+    let mut port = serialport::new("/dev/ttyAMA0", 115200)
         .timeout(Duration::from_millis(100))
         .open()
         .map_err(|e| format!("Failed to open UART: {}", e))?;

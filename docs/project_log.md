@@ -48,7 +48,15 @@ Button clicks and scroll wheel working perfectly with full range
 
 ---
 
-## Phase 5 Complete - Input Modification Framework ✅
+## Current Status: Debugging UART Relay
+
+**Issue**: Teensy test pattern runs but cursor doesn't move - USB HID output not working
+**Progress**: Pi→Teensy UART communication verified, test pattern executing, but Mouse.move() not affecting cursor
+**Next**: Fix Teensy USB HID device recognition in Windows
+
+## Previous Progress
+
+## Phase 5 Progress: Input Modification Framework
 **Date: July 22, 2025**
 
 ### Achievements:
