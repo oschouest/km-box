@@ -252,7 +252,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     info!("✓ Connected to mouse device");
 
     // Open UART connection to Teensy
-    let mut uart_port = serialport::new("/dev/ttyAMA0", 9600)
+    let mut uart_port = serialport::new("/dev/ttyAMA0", 115200)
         .timeout(Duration::from_millis(100))
         .data_bits(serialport::DataBits::Eight)
         .parity(serialport::Parity::None)
@@ -265,7 +265,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             e
         })?;
 
-    info!("✓ UART connected to Teensy at 9600 baud");
+    info!("✓ UART connected to Teensy at 115200 baud");
 
     // Send initialization signal
     let init_msg = "phase5_start\n";

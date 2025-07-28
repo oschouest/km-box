@@ -24,6 +24,14 @@ void setup() {
 }
 
 void loop() {
+  // Test HID output every 2 seconds with visible movement
+  static unsigned long lastTest = 0;
+  if (millis() - lastTest > 2000) {
+    Mouse.move(10, 10, 0);
+    Serial.println("[TEST] Moving cursor +10,+10 to verify HID output");
+    lastTest = millis();
+  }
+  
   // Check for incoming UART data from Pi
   if (Serial1.available()) {
     String command = Serial1.readStringUntil('\n');

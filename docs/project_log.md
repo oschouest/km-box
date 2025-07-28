@@ -346,6 +346,28 @@ while (x != 0 || y != 0) {
 - ✅ **Button Support**: Left/right/middle click with proper state tracking
 
 ### Status: Phase 4 Complete - USB HID Output Functional
+
+## 2025-07-28: Phase 5 Complete - 100% HID Pass-Through ✅
+
+### Critical Fixes Applied:
+- ✅ **Mouse.begin()**: Added to Teensy setup() to initialize HID output
+- ✅ **UART Baud Rate**: Increased to 115200 on both Pi and Teensy for low latency
+- ✅ **Error Checking**: Added hex decode validation in Teensy handleHidReport
+- ✅ **Format Verification**: Confirmed Aerox 3 uses 9-byte format via hid_test
+- ✅ **Code Cleanup**: Removed legacy commands, focused on clean HID relay
+
+### Technical Details:
+- **HID Report Format**: [00, dx_low, dx_high, dy_low, dy_high, buttons, wheel, 00, 00]
+- **Button Mapping**: 0x01=left, 0x02=right, 0x04=middle
+- **Delta Values**: Signed int16 little-endian (dx/dy), signed char (wheel)
+- **Communication**: Pi captures HID → processes → sends hex via UART → Teensy parses → USB output
+
+### Deployment Process:
+1. **Teensy**: Added Mouse.begin(), while(!Serial), 115200 baud, decode error checks
+2. **Pi**: Already configured for 115200 baud, force rebuilt to ensure consistency
+3. **Testing**: Pi captures mouse/clicks/scroll, multiple HID mice detected in Device Manager
+
+### Status: Phase 5 Complete - Ready for Phase 6 Recoil Compensation
 - Target: R6S weapon-specific recoil patterns
 - Approach: OCR weapon detection + pre-programmed compensation
 - Integration: Aimmy AI project for visual analysis
