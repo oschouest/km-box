@@ -2,7 +2,7 @@
 # Mouse sensitivity scaling and modification settings
 
 # Mouse sensitivity multiplier (1.0 = no change, >1.0 = faster, <1.0 = slower)
-sensitivity = 1.0
+sensitivity = 2.0
 
 # Button remapping: swap left and right mouse buttons
 remap_buttons = false
