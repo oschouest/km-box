@@ -371,3 +371,17 @@ while (x != 0 || y != 0) {
 - Target: R6S weapon-specific recoil patterns
 - Approach: OCR weapon detection + pre-programmed compensation
 - Integration: Aimmy AI project for visual analysis
+
+### 22:39 - USB HID Output Fix ✅
+- **Fixed Compilation**: Changed from USB_KEYBOARDMOUSE to USB_SERIAL_HID in platformio.ini
+- **Build Success**: Teensy firmware compiled and uploaded successfully
+- **HID Libraries**: Mouse.h and usb_mouse.c now properly linked with USB_SERIAL_HID flag
+- **Test Pattern**: Teensy runs Mouse.move(10,10,0) every 2s in loop() for verification
+- **Pi Integration**: Pi code ready at 115200 baud, all warnings non-critical
+
+### Current Status: Testing USB HID Output
+- Teensy firmware uploaded with Mouse library properly included
+- Test pattern should move cursor every 2 seconds if HID is functional
+- Pi→Teensy communication ready for full passthrough testing
+- Next: Verify cursor movement from Teensy test pattern, then test full Pi→Teensy→PC relay
+
