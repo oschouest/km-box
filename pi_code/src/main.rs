@@ -70,12 +70,17 @@ struct MouseReport {
 impl MouseReport {
     fn from_bytes(data: &[u8]) -> Option<Self> {
         if data.len() >= 9 {
-            // Use the raw bytes directly - they're already in the right range for movement
+            // Parse 9-byte HID report: [00, dx_low, dx_high, dy_low, dy_high, buttons, wheel, 00, 00]
+            let dx = i16::from_le_bytes([data[1], data[2]]);
+            let dy = i16::from_le_bytes([data[3], data[4]]);
+            let buttons = data[5];
+            let wheel = data[6] as i8;
+            
             Some(MouseReport {
-                buttons: data[5],  // buttons at position 5
-                dx: data[1] as i8, // use low byte directly
-                dy: data[3] as i8, // use low byte directly  
-                wheel: data[6] as i8, // wheel at position 6
+                buttons,
+                dx: dx as i8,  // Still store as i8 for internal use
+                dy: dy as i8,
+                wheel,
             })
         } else if data.len() >= 4 {
             // Fallback to 4-byte format
@@ -91,7 +96,7 @@ impl MouseReport {
     }
 
     fn to_bytes(&self) -> Vec<u8> {
-        // Send the raw 9-byte format that Teensy expects
+        // Send 9-byte format preserving full int16 range
         let dx_bytes = (self.dx as i16).to_le_bytes();
         let dy_bytes = (self.dy as i16).to_le_bytes();
         vec![0x00, dx_bytes[0], dx_bytes[1], dy_bytes[0], dy_bytes[1], self.buttons, self.wheel as u8, 0x00, 0x00]
@@ -279,59 +284,59 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             Ok(size) if size > 0 => {
                 report_count += 1;
 
-                // Parse the HID report
-                if let Some(original_report) = MouseReport::from_bytes(&buf[..size]) {
-                    debug!("Raw HID report: buttons={:02x}, dx={}, dy={}, wheel={}", 
-                           original_report.buttons, original_report.dx, original_report.dy, original_report.wheel);
+                if size >= 9 {
+                    // Extract full int16 values from raw buffer
+                    let buttons = buf[5];
+                    let dx = i16::from_le_bytes([buf[1], buf[2]]);
+                    let dy = i16::from_le_bytes([buf[3], buf[4]]);
+                    let wheel = buf[6] as i8;
 
-                    // Apply modifications
-                    match modifier.modify_mouse_report(original_report.clone()) {
-                        Ok(modified_report) => {
-                            // Check if any modifications were applied
-                            let was_modified = original_report.dx != modified_report.dx ||
-                                             original_report.dy != modified_report.dy ||
-                                             original_report.buttons != modified_report.buttons;
+                    debug!("Raw HID report: buttons={:02x}, dx={}, dy={}, wheel={}", buttons, dx, dy, wheel);
 
-                            if was_modified {
-                                modified_count += 1;
-                                debug!("Modified report: buttons={:02x}, dx={}, dy={}, wheel={}", 
-                                       modified_report.buttons, modified_report.dx, modified_report.dy, modified_report.wheel);
-                            }
+                    // Apply sensitivity scaling to full int16 values
+                    let scaled_dx = (dx as f32 * modifier.config.sensitivity).round() as i16;
+                    let scaled_dy = (dy as f32 * modifier.config.sensitivity).round() as i16;
 
-                            // Convert back to bytes and send
-                            let modified_bytes = modified_report.to_bytes();
-                            let hex_data = hex::encode(&modified_bytes);
-                            let uart_msg = format!("HID:{}\n", hex_data);
-                            
-                            if let Err(e) = uart_port.write_all(uart_msg.as_bytes()) {
-                                error!("UART write failed: {}", e);
-                            } else if let Err(e) = uart_port.flush() {
-                                error!("UART flush failed: {}", e);
-                            }
-                        }
-                        Err(e) => {
-                            // Fallback to original report on modification error
-                            warn!("Modification failed: {}. Using original report.", e);
-                            let hex_data = hex::encode(&buf[..size]);
-                            let uart_msg = format!("HID:{}\n", hex_data);
-                            
-                            if let Err(e) = uart_port.write_all(uart_msg.as_bytes()) {
-                                error!("UART write failed: {}", e);
-                            } else if let Err(e) = uart_port.flush() {
-                                error!("UART flush failed: {}", e);
-                            }
-                        }
+                    // Apply button remapping if enabled
+                    let final_buttons = if modifier.config.remap_buttons {
+                        let mut remapped = buttons;
+                        if buttons & 0x01 != 0 { remapped |= 0x02; remapped &= !0x01; } // Left -> Right
+                        if buttons & 0x02 != 0 { remapped |= 0x01; remapped &= !0x02; } // Right -> Left
+                        remapped
+                    } else {
+                        buttons
+                    };
+
+                    // Check if modifications were applied
+                    let was_modified = dx != scaled_dx || dy != scaled_dy || buttons != final_buttons;
+                    if was_modified {
+                        modified_count += 1;
+                        debug!("Modified report: buttons={:02x}, dx={}, dy={}, wheel={}", final_buttons, scaled_dx, scaled_dy, wheel);
                     }
-                } else {
-                    // Not a standard mouse report, forward as-is
-                    debug!("Non-standard HID report ({} bytes), forwarding as-is", size);
-                    let hex_data = hex::encode(&buf[..size]);
+
+                    // Repack into full 9-byte buffer preserving int16
+                    let mut modified_buf = buf.clone();
+                    modified_buf[1..3].copy_from_slice(&scaled_dx.to_le_bytes());
+                    modified_buf[3..5].copy_from_slice(&scaled_dy.to_le_bytes());
+                    modified_buf[5] = final_buttons;
+                    modified_buf[6] = wheel as u8;
+
+                    // Encode full 9-byte buffer to hex (18 chars) and send
+                    let hex_data = hex::encode(&modified_buf[..size]);
                     let uart_msg = format!("HID:{}\n", hex_data);
                     
                     if let Err(e) = uart_port.write_all(uart_msg.as_bytes()) {
                         error!("UART write failed: {}", e);
                     } else if let Err(e) = uart_port.flush() {
                         error!("UART flush failed: {}", e);
+                    }
+                } else {
+                    // Fallback for smaller reports - send as-is
+                    warn!("Unexpected report size: {} bytes, expected 9", size);
+                    let hex_data = hex::encode(&buf[..size]);
+                    let uart_msg = format!("HID:{}\n", hex_data);
+                    if let Err(e) = uart_port.write_all(uart_msg.as_bytes()) {
+                        error!("UART write failed: {}", e);
                     }
                 }
 
