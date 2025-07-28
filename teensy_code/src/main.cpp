@@ -10,7 +10,10 @@ void sendMouseReport(uint8_t buttons, int16_t dx, int16_t dy, signed char wheel)
 
 void setup() {
   Serial.begin(115200);  // USB Serial for debugging
-  Serial1.begin(9600);   // UART for Pi communication
+  while (!Serial);       // Wait for serial
+  Serial1.begin(115200); // UART for Pi communication (higher baud for low latency)
+  
+  Mouse.begin();         // Initialize HID mouse output
   
   pinMode(LED_BUILTIN, OUTPUT);
   digitalWrite(LED_BUILTIN, LOW);
@@ -21,13 +24,6 @@ void setup() {
 }
 
 void loop() {
-  // Heartbeat (reduced frequency for production)
-  static unsigned long lastHeartbeat = 0;
-  if (millis() - lastHeartbeat > 10000) {
-    Serial.println("[HEARTBEAT] Phase 5 active - USB HID passthrough ready");
-    lastHeartbeat = millis();
-  }
-  
   // Check for incoming UART data from Pi
   if (Serial1.available()) {
     String command = Serial1.readStringUntil('\n');
@@ -35,45 +31,12 @@ void loop() {
     
     Serial.printf("[UART] Received: '%s'\n", command.c_str());
     
-    // Handle Phase 5 initialization
-    if (command == "phase5_start") {
-      Serial1.println("phase5_ready");
-      Serial.println("[UART] Phase 5 initialization complete - USB HID ready");
-      digitalWrite(LED_BUILTIN, HIGH); // Indicate ready
-    }
-    // Handle HID reports: HID:001234abcd
-    else if (command.startsWith("HID:")) {
+    // Handle HID reports: HID:001234abcd...
+    if (command.startsWith("HID:")) {
       String hexData = command.substring(4);
       handleHidReport(hexData);
-    }
-    // Legacy commands (still supported)
-    else if (command == "ping") {
-      Serial1.println("pong");
-      Serial.println("[UART] Sent: pong");
-    }
-    else if (command == "led_on") {
-      digitalWrite(LED_BUILTIN, HIGH);
-      Serial1.println("led_on_ok");
-      Serial.println("[UART] LED ON, Sent: led_on_ok");
-    }
-    else if (command == "led_off") {
-      digitalWrite(LED_BUILTIN, LOW);
-      Serial1.println("led_off_ok");
-      Serial.println("[UART] LED OFF, Sent: led_off_ok");
-    }
-    else if (command == "status") {
-      bool ledState = digitalRead(LED_BUILTIN);
-      String response = "led_" + String(ledState ? "on" : "off");
-      Serial1.println(response);
-      Serial.printf("[UART] Sent: %s\n", response.c_str());
-    }
-    else if (command == "test") {
-      Serial1.println("test_ok");
-      Serial.println("[UART] Sent: test_ok");
-    }
-    else {
-      Serial1.println("unknown_command");
-      Serial.printf("[UART] Unknown command: '%s'\n", command.c_str());
+    } else {
+      Serial.printf("[UART] Ignored non-HID: '%s'\n", command.c_str());
     }
     
     Serial1.flush(); // Ensure data is sent
@@ -89,16 +52,26 @@ void handleHidReport(String hexData) {
   }
   
   uint8_t report[9] = {0};
+  bool parseSuccess = true;
   
   for (int i = 0; i < 9; i++) {
     String byteString = hexData.substring(i * 2, i * 2 + 2);
-    report[i] = (uint8_t)strtol(byteString.c_str(), NULL, 16);
+    char* endPtr;
+    long val = strtol(byteString.c_str(), &endPtr, 16);
+    if (endPtr == byteString.c_str() || *endPtr != '\0') {  // Check for parse error
+      Serial.printf("[ERROR] Hex parse failed at byte %d: '%s'\n", i, byteString.c_str());
+      parseSuccess = false;
+      break;
+    }
+    report[i] = (uint8_t)val;
   }
+  
+  if (!parseSuccess) return;
   
   // Parse 9-byte HID report: [00, dx_low, dx_high, dy_low, dy_high, buttons, wheel, 00, 00]
   uint8_t buttons = report[5];
-  int16_t dx = (report[2] << 8) | report[1];  // Little-endian int16
-  int16_t dy = (report[4] << 8) | report[3];  // Little-endian int16
+  int16_t dx = (int16_t)((report[2] << 8) | report[1]);  // LE signed int16
+  int16_t dy = (int16_t)((report[4] << 8) | report[3]);  // LE signed int16
   signed char wheel = (signed char)report[6];
   
   Serial.printf("[HID] Parsed: buttons=0x%02x dx=%d dy=%d wheel=%d\n", buttons, dx, dy, wheel);
