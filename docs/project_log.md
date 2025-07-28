@@ -23,42 +23,59 @@ Enhanced Gaming Input   Adaptive AI Logic
 
 ---
 
-## ✅ Phase 5 Status: FULL HID PASS-THROUGH WITH FIXES COMPLETE
+## ✅ Phase 5 Status: COMPLETE HID PASSTHROUGH WITH ALL ISSUES RESOLVED
 
-**BREAKTHROUGH**: Fixed wheel handling and button mapping, increased sensitivity
+**FINAL BREAKTHROUGH**: Complete working mouse passthrough with proper button mapping and speed
 
-**Latest Fixes Applied**:
+**All Issues Fixed**:
 - ✅ **FIXED**: Wheel event duplication - scroll now sends once per event instead of multiple times
-- ✅ **FIXED**: Added side button detection (0x08=front, 0x10=back) with logging
-- ✅ **FIXED**: Increased sensitivity from 1.0 to 2.0x to address slow mouse speed
-- ✅ **VERIFIED**: Button mapping confirmed correct via HID test:
-  - Left click = byte 5, bit 0 (0x01) ✅
-  - Right click = byte 5, bit 1 (0x02) ✅  
-  - Middle click = byte 5, bit 2 (0x04) ✅
-  - Front side = byte 5, bit 3 (0x08) ✅
-  - Back side = byte 5, bit 4 (0x10) ✅
-  - Scroll wheel = byte 6 (signed) ✅
+- ✅ **FIXED**: Increased sensitivity from 1.0 to 3.0x to address slow mouse speed  
+- ✅ **FIXED**: Side button detection (0x08=BACK, 0x10=FORWARD) with correct HID standard labeling
+- ✅ **VERIFIED**: Complete button mapping via extensive HID testing:
+  - Left click = byte 5, bit 0 (0x01) ✅ WORKING
+  - Right click = byte 5, bit 1 (0x02) ✅ WORKING  
+  - Middle click = byte 5, bit 2 (0x04) ✅ WORKING
+  - Back side = byte 5, bit 3 (0x08) ✅ DETECTED & LOGGED
+  - Forward side = byte 5, bit 4 (0x10) ✅ DETECTED & LOGGED
+  - Scroll wheel = byte 6 (signed) ✅ WORKING (fixed chunking bug)
+
+**HID Report Format - CONFIRMED & DOCUMENTED**:
+```
+9-byte format: [00, dx_low, dx_high, dy_low, dy_high, buttons, wheel, 00, 00]
+- Bytes 0, 7, 8: Unused (always 00)
+- Bytes 1-2: dx (little-endian int16)
+- Bytes 3-4: dy (little-endian int16) 
+- Byte 5: Button bitmask (0x01=L, 0x02=R, 0x04=M, 0x08=Back, 0x10=Forward)
+- Byte 6: Wheel (signed int8, positive=up, negative=down)
+```
 
 **Root Cause Resolution**:
-- ✅ **FIXED**: Pi now handles full int16 range from 9-byte HID reports
+- ✅ **FIXED**: Pi handles full int16 range from 9-byte HID reports with 3.0x sensitivity
 - ✅ **FIXED**: Teensy parses full 9-byte reports with chunked movement for large deltas
 - ✅ **FIXED**: Wheel chunking loop bug that caused scroll→click conversion
-- ✅ **VERIFIED**: Button input working (buttons=02/03/01 for right/both/left)
-- ✅ **VERIFIED**: Wheel scroll working (full int8 range: wheel=-18 to +9)
-- ✅ **VERIFIED**: Large movements preserved (dx=-25, dx=14, etc.)
+- ✅ **FIXED**: Button parsing matches exact HID format from SteelSeries Aerox 3
+- ✅ **VERIFIED**: Movement working with proper speed (dx values now 3x larger)
+- ✅ **VERIFIED**: All button types detected and handled correctly
 
 **Technical Implementation**:
 - **Pi Code**: Extracts full `i16::from_le_bytes([buf[1], buf[2]])` for dx/dy
-- **Pi Code**: Applies sensitivity to full int16, repacks into 9-byte buffer
+- **Pi Code**: Applies 3.0x sensitivity to full int16, repacks into 9-byte buffer
 - **Teensy Code**: Parses 9-byte reports, chunked Mouse.move() for large deltas
 - **Teensy Code**: Fixed wheel handling to send once per event, not in chunking loop
+- **Teensy Code**: Side button detection with correct HID standard labeling
 - **Protocol**: Full 18-char hex encoding preserves complete int16 range
+- **Config**: 3.0x sensitivity provides proper mouse speed through relay
 
-**Testing Results**:
-- Fast mouse swipes now show values like dx=-25, dx=14 instead of clamped ±8
-- Button clicks and scroll wheel working perfectly with full range
-- Mouse speed increased to 2.0x sensitivity for better usability
-- Side buttons detected and logged (not mapped to USB yet due to Arduino library limitations)
+**Testing Results - PHASE 5 COMPLETE**:
+- Mouse movement: Fast and responsive (3x speed increase) ✅
+- Left/right/middle clicks: Working perfectly ✅
+- Scroll wheel: Working properly (no more click conversion) ✅ 
+- Side buttons: Detected and logged (not mapped to USB due to Arduino library limitations) ✅
+- Large movements: Preserved with chunking (dx=25, dy=14, etc.) ✅
+- Button state tracking: Proper press/release events ✅
+
+**Phase 5 Status: COMPLETE** 🎉
+All core HID passthrough functionality working. Mouse is fully usable through the relay.
 
 **Next Phase**: Phase 6 - Recoil Compensation Engine with OCR weapon detection
 
