@@ -6,7 +6,7 @@ uint8_t prev_buttons = 0;
 
 // Function declarations
 void handleHidReport(String hexData);
-void sendMouseReport(uint8_t buttons, int8_t dx, int8_t dy, int8_t wheel);
+void sendMouseReport(uint8_t buttons, int16_t dx, int16_t dy, signed char wheel);
 
 void setup() {
   Serial.begin(115200);  // USB Serial for debugging
@@ -83,23 +83,23 @@ void loop() {
 void handleHidReport(String hexData) {
   // Convert hex string to bytes
   int dataLength = hexData.length() / 2;
-  if (dataLength != 4) {
-    Serial.printf("[ERROR] HID report wrong length: %d bytes (expected 4)\n", dataLength);
+  if (dataLength != 9) {
+    Serial.printf("[ERROR] HID report wrong length: %d bytes (expected 9)\n", dataLength);
     return;
   }
   
-  uint8_t report[4] = {0};
+  uint8_t report[9] = {0};
   
-  for (int i = 0; i < 4; i++) {
+  for (int i = 0; i < 9; i++) {
     String byteString = hexData.substring(i * 2, i * 2 + 2);
     report[i] = (uint8_t)strtol(byteString.c_str(), NULL, 16);
   }
   
-  // Parse 4-byte HID report: [buttons, dx, dy, wheel]
-  uint8_t buttons = report[0];
-  int8_t dx = (int8_t)report[1];
-  int8_t dy = (int8_t)report[2];
-  int8_t wheel = (int8_t)report[3];
+  // Parse 9-byte HID report: [00, dx_low, dx_high, dy_low, dy_high, buttons, wheel, 00, 00]
+  uint8_t buttons = report[5];
+  int16_t dx = (report[2] << 8) | report[1];  // Little-endian int16
+  int16_t dy = (report[4] << 8) | report[3];  // Little-endian int16
+  signed char wheel = (signed char)report[6];
   
   Serial.printf("[HID] Parsed: buttons=0x%02x dx=%d dy=%d wheel=%d\n", buttons, dx, dy, wheel);
   
@@ -112,7 +112,7 @@ void handleHidReport(String hexData) {
   Serial1.println("hid_processed");
 }
 
-void sendMouseReport(uint8_t buttons, int8_t dx, int8_t dy, int8_t wheel) {
+void sendMouseReport(uint8_t buttons, int16_t dx, int16_t dy, signed char wheel) {
   // Handle button state changes
   if ((buttons & 0x01) != (prev_buttons & 0x01)) {
     if (buttons & 0x01) {
@@ -146,9 +146,17 @@ void sendMouseReport(uint8_t buttons, int8_t dx, int8_t dy, int8_t wheel) {
   
   prev_buttons = buttons;
   
-  // Send movement - simple single call
-  if (dx != 0 || dy != 0 || wheel != 0) {
-    Mouse.move(dx, dy, wheel);
-    Serial.printf("[USB] Mouse.move(%d, %d, %d)\n", dx, dy, wheel);
+  // Handle movement with chunking for large deltas
+  while (dx != 0 || dy != 0 || wheel != 0) {
+    signed char dx_chunk = (signed char)max(-127, min(127, dx));
+    signed char dy_chunk = (signed char)max(-127, min(127, dy));
+    signed char wheel_chunk = (signed char)max(-127, min(127, wheel));
+    
+    Mouse.move(dx_chunk, dy_chunk, wheel_chunk);
+    Serial.printf("[USB] Mouse.move(%d, %d, %d)\n", dx_chunk, dy_chunk, wheel_chunk);
+    
+    dx -= dx_chunk;
+    dy -= dy_chunk;
+    wheel -= wheel_chunk;
   }
 }
