@@ -71,16 +71,41 @@ impl MouseReport {
     fn from_bytes(data: &[u8]) -> Option<Self> {
         if data.len() >= 9 {
             // Parse 9-byte HID report: [00, dx_low, dx_high, dy_low, dy_high, buttons, wheel, 00, 00]
+            // Parse 9-byte HID report: [00, dx_low, dx_high, dy_low, dy_high, buttons, wheel, 00, 00]
             let dx = i16::from_le_bytes([data[1], data[2]]);
             let dy = i16::from_le_bytes([data[3], data[4]]);
-            let buttons = data[5];
-            let wheel = data[6] as i8;
+            let raw_buttons = data[5];
+            let wheel_byte = data[6] as i8;
+            
+            // SteelSeries Aerox 3 SCROLL WHEEL FIX:
+            // This mouse sends 0xff for scroll wheel events instead of wheel data
+            // Convert 0xff (with no movement) to wheel events instead of button presses
+            let (buttons, wheel) = if raw_buttons == 0xff && dx == 0 && dy == 0 {
+                // 0xff + no movement = scroll wheel event
+                // Convert to wheel=1 (scroll up) - direction detection TBD
+                (0x00, 1i8)
+            } else if raw_buttons == 0xff {
+                // 0xff with movement = might be middle button + movement
+                // For now convert to middle button (0x04)
+                (0x04, wheel_byte)
+            } else {
+                // Normal button event
+                (raw_buttons, wheel_byte)
+            };
             
             // Debug: Print raw HID bytes when we have movement, buttons, or wheel
-            if dx != 0 || dy != 0 || buttons != 0 || wheel != 0 {
+            if dx != 0 || dy != 0 || raw_buttons != 0 || wheel != 0 {
                 println!("[PI_DEBUG] Raw HID: {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x}", 
                          data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7], data[8]);
-                println!("[PI_DEBUG] Parsed: dx={}, dy={}, buttons=0x{:02x}, wheel={}", dx, dy, buttons, wheel);
+                if raw_buttons == 0xff {
+                    if dx == 0 && dy == 0 {
+                        println!("[PI_DEBUG] SCROLL: 0xff -> wheel={}", wheel);
+                    } else {
+                        println!("[PI_DEBUG] MIDDLE+MOVE: 0xff -> button=0x04");
+                    }
+                } else {
+                    println!("[PI_DEBUG] Parsed: dx={}, dy={}, buttons=0x{:02x}, wheel={}", dx, dy, buttons, wheel);
+                }
             }
             
             Some(MouseReport {
@@ -103,11 +128,17 @@ impl MouseReport {
 
 struct InputModifier {
     config: Config,
+    last_ff_time: std::time::Instant,
+    ff_count: u32,
 }
 
 impl InputModifier {
     fn new(config: Config) -> Self {
-        Self { config }
+        Self { 
+            config,
+            last_ff_time: std::time::Instant::now(),
+            ff_count: 0,
+        }
     }
 
     fn modify_mouse_report(&self, report: MouseReport) -> Result<MouseReport, String> {
