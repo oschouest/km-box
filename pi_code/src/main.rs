@@ -207,4 +207,87 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         info!("Enumerating all HID devices...");
         let api = HidApi::new()?;
         for device_info in api.device_list() {
-            println!("Device: VID={:04x
+            println!("Device: VID={:04x} PID={:04x} - {}", 
+                     device_info.vendor_id(), 
+                     device_info.product_id(),
+                     device_info.product_string().unwrap_or("Unknown"));
+        }
+        return Ok(());
+    }
+
+    // Parse VID/PID from hex strings
+    let vid = u16::from_str_radix(&args.mouse_vid.trim_start_matches("0x"), 16)
+        .map_err(|_| "Invalid VID format")?;
+    let pid = u16::from_str_radix(&args.mouse_pid.trim_start_matches("0x"), 16)
+        .map_err(|_| "Invalid PID format")?;
+
+    info!("Target mouse: VID={:04x} PID={:04x}", vid, pid);
+
+    // Load configuration with CLI overrides
+    let config = load_config(&args.config, &args);
+    info!("Configuration: sensitivity={:.2}, remap_buttons={}, deadzone={}", 
+          config.sensitivity, config.remap_buttons, config.deadzone_threshold);
+
+    // Initialize HID API and find target mouse
+    let api = HidApi::new()?;
+    let device = api.open(vid, pid)
+        .map_err(|_| format!("Failed to open mouse device VID={:04x} PID={:04x}. Try --list-devices to see available devices.", vid, pid))?;
+    info!("✓ Connected to mouse device");
+
+    // Setup UART connection to Teensy
+    let mut port = serialport::new("/dev/ttyACM0", 115200)
+        .timeout(Duration::from_millis(100))
+        .open()
+        .map_err(|e| format!("Failed to open UART: {}", e))?;
+    info!("✓ UART connected to Teensy at 115200 baud");
+
+    // Send initialization signal
+    port.write_all(b"INIT:PHASE5\n")?;
+    info!("✓ Sent Phase 5 initialization signal to Teensy");
+
+    // Initialize input modifier
+    let modifier = InputModifier::new(config);
+
+    info!("Starting input modification loop... Press Ctrl+C to stop");
+
+    let mut buffer = [0u8; 64];
+    loop {
+        match device.read_timeout(&mut buffer, 1000) {
+            Ok(size) if size > 0 => {
+                if let Some(report) = MouseReport::from_bytes(&buffer[..size]) {
+                    // Only process if there's actual movement or button changes
+                    if report.dx != 0 || report.dy != 0 || report.buttons != 0 || report.wheel != 0 {
+                        debug!("Raw HID: dx={}, dy={}, buttons={:02x}, wheel={}", 
+                               report.dx, report.dy, report.buttons, report.wheel);
+
+                        // Apply input modifications
+                        match modifier.modify_mouse_report(report) {
+                            Ok(modified_report) => {
+                                // Convert to bytes and send via UART
+                                let bytes = modified_report.to_bytes();
+                                let hex_string = hex::encode(&bytes);
+                                let uart_message = format!("HID:{}\n", hex_string);
+                                
+                                if let Err(e) = port.write_all(uart_message.as_bytes()) {
+                                    error!("UART write error: {}", e);
+                                } else {
+                                    debug!("Sent to Teensy: {}", uart_message.trim());
+                                }
+                            }
+                            Err(e) => {
+                                error!("Input modification error: {}", e);
+                            }
+                        }
+                    }
+                }
+            }
+            Ok(_) => {
+                // Timeout - normal, continue loop
+            }
+            Err(e) => {
+                error!("HID read error: {}", e);
+                std::thread::sleep(Duration::from_millis(100));
+            }
+        }
+    }
+}
