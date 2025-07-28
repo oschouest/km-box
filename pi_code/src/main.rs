@@ -76,6 +76,13 @@ impl MouseReport {
             let buttons = data[5];
             let wheel = data[6] as i8;
             
+            // Debug: Print raw HID bytes when we have movement, buttons, or wheel
+            if dx != 0 || dy != 0 || buttons != 0 || wheel != 0 {
+                println!("[PI_DEBUG] Raw HID: {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x}", 
+                         data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7], data[8]);
+                println!("[PI_DEBUG] Parsed: dx={}, dy={}, buttons=0x{:02x}, wheel={}", dx, dy, buttons, wheel);
+            }
+            
             Some(MouseReport {
                 buttons,
                 dx,
