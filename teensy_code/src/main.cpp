@@ -121,19 +121,48 @@ void sendMouseReport(uint8_t buttons, int16_t dx, int16_t dy, signed char wheel)
     }
   }
   
+  // Handle side buttons (front = 0x08, back = 0x10)
+  // Note: Arduino Mouse library doesn't have MOUSE_SIDE constants
+  // For now, we'll log them but not send - user can remap later
+  if ((buttons & 0x08) != (prev_buttons & 0x08)) {
+    if (buttons & 0x08) {
+      Serial.println("[USB] Front side button pressed (not mapped)");
+    } else {
+      Serial.println("[USB] Front side button released");
+    }
+  }
+  
+  if ((buttons & 0x10) != (prev_buttons & 0x10)) {
+    if (buttons & 0x10) {
+      Serial.println("[USB] Back side button pressed (not mapped)");
+    } else {
+      Serial.println("[USB] Back side button released");
+    }
+  }
+  
   prev_buttons = buttons;
   
-  // Handle movement with chunking for large deltas
-  while (dx != 0 || dy != 0 || wheel != 0) {
+  // Handle movement with chunking for large deltas (but wheel should be sent once)
+  signed char wheel_to_send = (signed char)max(-127, min(127, wheel));
+  
+  while (dx != 0 || dy != 0) {
     signed char dx_chunk = (signed char)max(-127, min(127, dx));
     signed char dy_chunk = (signed char)max(-127, min(127, dy));
-    signed char wheel_chunk = (signed char)max(-127, min(127, wheel));
+    
+    // Only send wheel data on first iteration
+    signed char wheel_chunk = (wheel_to_send != 0) ? wheel_to_send : 0;
+    wheel_to_send = 0;  // Clear after first send
     
     Mouse.move(dx_chunk, dy_chunk, wheel_chunk);
     Serial.printf("[USB] Mouse.move(%d, %d, %d)\n", dx_chunk, dy_chunk, wheel_chunk);
     
     dx -= dx_chunk;
     dy -= dy_chunk;
-    wheel -= wheel_chunk;
+  }
+  
+  // If only wheel data (no movement), send it once
+  if (wheel_to_send != 0) {
+    Mouse.move(0, 0, wheel_to_send);
+    Serial.printf("[USB] Mouse.move(0, 0, %d)\n", wheel_to_send);
   }
 }
