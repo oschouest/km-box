@@ -79,11 +79,13 @@ impl MouseReport {
             
             // SteelSeries Aerox 3 SCROLL WHEEL FIX:
             // This mouse sends 0xff for scroll wheel events instead of wheel data
-            // Convert 0xff (with no movement) to wheel events instead of button presses
+            // The actual wheel direction is in the wheel_byte (position 6)
             let (buttons, wheel) = if raw_buttons == 0xff && dx == 0 && dy == 0 {
                 // 0xff + no movement = scroll wheel event
-                // Convert to wheel=1 (scroll up) - direction detection TBD
-                (0x00, 1i8)
+                // Use the actual wheel_byte to detect direction:
+                // wheel_byte = 1 means scroll up, wheel_byte = 255 (or -1) means scroll down
+                let wheel_direction = if wheel_byte == 1 { 1 } else if wheel_byte == 255 || wheel_byte == -1 { -1 } else { 0 };
+                (0x00, wheel_direction)
             } else if raw_buttons == 0xff {
                 // 0xff with movement = might be middle button + movement
                 // For now convert to middle button (0x04)
